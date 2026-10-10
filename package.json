@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "npm start --prefix ai-chatbox",
+    "build": "cd ai-chatbox && npm install",
+    "start": "node ai-chatbox/server.js",
     "dev": "npm start --prefix ai-chatbox"
   }
 }
