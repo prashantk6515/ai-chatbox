@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Gemini AI Studio · Modern AI Chatbox</title>
+  <meta name="description" content="Next-generation AI chat interface powered by Gemini with real-time clock, live weather data, multi-model fallback, and modern aesthetics.">
+  
+  <!-- Modern Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Markdown Parser -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-sparkle">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="url(#sparkle-grad)" />
+              <defs>
+                <linearGradient id="sparkle-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#38bdf8"/>
+                  <stop offset="0.5" stop-color="#818cf8"/>
+                  <stop offset="1" stop-color="#c084fc"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <span class="brand-text">Gemini <span class="brand-badge">Studio</span></span>
+        </div>
+        <button id="close-sidebar-btn" class="icon-btn mobile-only" aria-label="Close sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <button id="new-chat-btn" class="btn-new-chat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+        <span>New Conversation</span>
+      </button>
+
+      <div class="sidebar-section-title">Recent Chats</div>
+      <div id="chat-history-list" class="chat-history-list">
+        <!-- Rendered dynamically via JS -->
+      </div>
+
+      <!-- Ambient Music Player Tile in Sidebar -->
+      <div id="sidebar-music-card" class="sidebar-music-card">
+        <div class="music-card-header">
+          <div class="music-card-info">
+            <span class="music-badge">Background Track</span>
+            <span class="music-card-title">Mujhko Barsaat Bana Lo</span>
+            <span class="music-card-artist">Armaan Malik · Junooniyat</span>
+          </div>
+          <button id="card-music-toggle" class="music-ctrl-btn" type="button" aria-label="Play / Pause">
+            <svg id="card-play-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <svg id="card-pause-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          </button>
+        </div>
+        <div class="music-embed-container">
+          <iframe
+            id="yt-embed-player"
+            src="https://www.youtube-nocookie.com/embed/sR81J1-2N1o?enablejsapi=1&autoplay=0&loop=1&playlist=sR81J1-2N1o"
+            title="Mujhko Barsaat Bana Lo"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="system-status-card">
+          <div class="status-indicator">
+            <span class="pulse-dot"></span>
+            <span class="status-text">Gemini Multi-Fallback</span>
+          </div>
+          <div class="status-features">
+            <span class="feature-tag">Live Weather</span>
+            <span class="feature-tag">Real-Time Clock</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Chat Workspace -->
+    <main class="chat-main">
+      <!-- Top Navigation Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="toggle-sidebar-btn" class="icon-btn" aria-label="Toggle sidebar" title="Toggle Sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <div class="model-pill">
+            <span class="model-dot"></span>
+            <span class="model-name">Gemini 3.5 / 3.1 Flash</span>
+            <span class="model-version">v2026</span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Ambient Music Player Widget -->
+          <div id="music-player-widget" class="music-player-pill" title="Now Playing: Mujhko Barsaat Bana Lo">
+            <div class="music-equalizer" id="music-equalizer">
+              <span class="eq-bar"></span>
+              <span class="eq-bar"></span>
+              <span class="eq-bar"></span>
+              <span class="eq-bar"></span>
+            </div>
+            <div class="music-info">
+              <span class="music-title">Mujhko Barsaat Bana Lo</span>
+              <span class="music-artist">Armaan Malik · Junooniyat</span>
+            </div>
+            <button id="music-toggle-btn" class="music-ctrl-btn" type="button" aria-label="Toggle Music" title="Play / Pause">
+              <svg id="music-play-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <svg id="music-pause-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            </button>
+          </div>
+
+          <!-- Live Clock Pill -->
+          <div id="live-clock" class="live-clock-pill" title="Current Local Time">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <span id="live-clock-text">--:--</span>
+          </div>
+
+          <!-- Theme Toggle -->
+          <button id="theme-toggle-btn" class="icon-btn" aria-label="Toggle theme" title="Toggle Theme">
+            <svg id="theme-icon-dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <svg id="theme-icon-light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          </button>
+
+          <!-- Clear Chat -->
+          <button id="clear-chat-btn" class="icon-btn" aria-label="Clear chat" title="Clear Chat">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Message Container -->
+      <section id="messages-container" class="messages-container" aria-live="polite">
+        <!-- Welcome Screen -->
+        <div id="welcome-screen" class="welcome-screen">
+          <div class="welcome-hero-sparkle">
+            <div class="sparkle-glow"></div>
+            <div class="sparkle-avatar">
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="url(#hero-sparkle)" />
+                <defs>
+                  <linearGradient id="hero-sparkle" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#38bdf8"/>
+                    <stop offset="0.5" stop-color="#818cf8"/>
+                    <stop offset="1" stop-color="#c084fc"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+          </div>
+          
+          <h1 class="welcome-title">Where knowledge meets intelligence.</h1>
+          <p class="welcome-subtitle">Ask anything, analyze code, or query live weather &amp; real-time information with automated high-demand fallback.</p>
+
+          <div class="suggestion-grid">
+            <button class="suggestion-card" data-prompt="What is the weather in Bihar right now?">
+              <div class="card-icon weather">🌦️</div>
+              <div class="card-content">
+                <div class="card-title">Live Weather</div>
+                <div class="card-desc">What is the weather in Bihar right now?</div>
+              </div>
+              <span class="card-arrow">→</span>
+            </button>
+
+            <button class="suggestion-card" data-prompt="What is today's exact date and day of the week?">
+              <div class="card-icon clock">🕒</div>
+              <div class="card-content">
+                <div class="card-title">Real-Time Clock</div>
+                <div class="card-desc">What is today's exact date and day?</div>
+              </div>
+              <span class="card-arrow">→</span>
+            </button>
+
+            <button class="suggestion-card" data-prompt="Write a modern JavaScript debounce and throttle implementation with TypeScript types.">
+              <div class="card-icon code">💻</div>
+              <div class="card-content">
+                <div class="card-title">Clean Code</div>
+                <div class="card-desc">Write a JS debounce &amp; throttle utility</div>
+              </div>
+              <span class="card-arrow">→</span>
+            </button>
+
+            <button class="suggestion-card" data-prompt="Explain quantum computing principles simply with a real-world analogy.">
+              <div class="card-icon idea">💡</div>
+              <div class="card-content">
+                <div class="card-title">Concept Deep-Dive</div>
+                <div class="card-desc">Explain quantum computing simply</div>
+              </div>
+              <span class="card-arrow">→</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scroll to bottom button -->
+      <button id="scroll-bottom-btn" class="scroll-bottom-btn" aria-label="Scroll to bottom" style="display: none;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+      </button>
+
+      <!-- Floating Modern Composer -->
+      <div class="composer-container">
+        <form id="chat-form" class="composer-card">
+          <div class="composer-top-row">
+            <textarea
+              id="message-input"
+              rows="1"
+              placeholder="Message Gemini AI Studio... (Shift + Enter for new line)"
+              aria-label="Your message"
+              required
+            ></textarea>
+          </div>
+
+          <div class="composer-actions">
+            <div class="composer-meta">
+              <span id="char-counter" class="char-counter">0 chars</span>
+              <span class="meta-sep">·</span>
+              <span class="composer-badge">Real-Time Active</span>
+            </div>
+
+            <div class="composer-buttons">
+              <button id="mic-btn" type="button" class="icon-action-btn" aria-label="Voice input" title="Voice Input (Speech-to-Text)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+              </button>
+
+              <button id="send-button" type="submit" class="send-btn" aria-label="Send message">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+              </button>
+            </div>
+          </div>
+        </form>
+        <div class="composer-disclaimer">Gemini AI Studio may produce inaccuracies. Real-time clock and live weather data are dynamically queried.</div>
+      </div>
+    </main>
+  </div>
+  <!-- Hidden Background Music Players -->
+  <div id="youtube-audio-player" style="position:fixed;bottom:-999px;left:-999px;width:1px;height:1px;pointer-events:none;"></div>
+  <audio id="html5-audio" loop preload="none"></audio>
+</body>
+</html>
