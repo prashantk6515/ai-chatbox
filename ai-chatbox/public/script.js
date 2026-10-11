@@ -344,6 +344,140 @@ function enhanceCodeBlocks(html) {
   return tempDiv.innerHTML;
 }
 
+// ==========================================================================
+// AI Kinetic Motion Video Generator Engine (Canvas + MediaRecorder Stream)
+// ==========================================================================
+
+function createAIVideoMotionStream(videoElement, imageUrl) {
+  if (!videoElement || !imageUrl) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1280;
+  canvas.height = 720;
+  const ctx = canvas.getContext("2d");
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = imageUrl;
+
+  let animFrameId = null;
+  let startTime = performance.now();
+
+  // Floating ambient kinetic particles (stardust / embers / sparkles)
+  const particles = Array.from({ length: 48 }, () => ({
+    x: Math.random() * 1280,
+    y: Math.random() * 720,
+    radius: Math.random() * 2.5 + 0.8,
+    speedX: (Math.random() - 0.5) * 0.7,
+    speedY: -Math.random() * 1.2 - 0.2,
+    alpha: Math.random() * 0.7 + 0.3,
+    pulse: Math.random() * Math.PI
+  }));
+
+  img.onload = () => {
+    if (!canvas.captureStream) {
+      videoElement.poster = imageUrl;
+      return;
+    }
+
+    try {
+      const stream = canvas.captureStream(30);
+      videoElement.srcObject = stream;
+      videoElement.muted = true;
+      videoElement.play().catch(() => {});
+    } catch (e) {
+      console.warn("captureStream error:", e);
+      videoElement.poster = imageUrl;
+    }
+
+    function animate(now) {
+      const elapsed = (now - startTime) / 1000;
+      const loopDuration = 8;
+      const progress = (elapsed % loopDuration) / loopDuration;
+      const pingPong = Math.sin(progress * Math.PI);
+
+      // Smooth cinematic camera pan and zoom (Ken Burns)
+      const scale = 1.0 + pingPong * 0.13;
+      const offsetX = Math.sin(progress * Math.PI * 2) * 22;
+      const offsetY = Math.cos(progress * Math.PI * 2) * 14;
+
+      ctx.clearRect(0, 0, 1280, 720);
+
+      ctx.save();
+      ctx.translate(640 + offsetX, 360 + offsetY);
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, -640, -360, 1280, 720);
+      ctx.restore();
+
+      // Atmospheric lighting sweep
+      const sweepX = (progress * 2 - 0.5) * 1280;
+      const flareGrad = ctx.createLinearGradient(sweepX - 280, 0, sweepX + 280, 720);
+      flareGrad.addColorStop(0, "rgba(255, 255, 255, 0.0)");
+      flareGrad.addColorStop(0.5, `rgba(255, 220, 140, ${0.08 + pingPong * 0.06})`);
+      flareGrad.addColorStop(1, "rgba(99, 102, 241, 0.04)");
+      ctx.fillStyle = flareGrad;
+      ctx.fillRect(0, 0, 1280, 720);
+
+      // Render floating divine stardust particles
+      particles.forEach(p => {
+        p.x += p.speedX;
+        p.y += p.speedY;
+        p.pulse += 0.04;
+        if (p.y < 0) p.y = 720;
+        if (p.x < 0) p.x = 1280;
+        if (p.x > 1280) p.x = 0;
+
+        const currentAlpha = p.alpha * (0.6 + Math.sin(p.pulse) * 0.4);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 245, 210, ${currentAlpha})`;
+        ctx.shadowColor = "rgba(255, 215, 0, 0.9)";
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+
+      // Subtle vignette
+      const vignette = ctx.createRadialGradient(640, 360, 300, 640, 360, 800);
+      vignette.addColorStop(0, "rgba(0,0,0,0)");
+      vignette.addColorStop(1, "rgba(0,0,0,0.4)");
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, 1280, 720);
+
+      animFrameId = requestAnimationFrame(animate);
+    }
+
+    animFrameId = requestAnimationFrame(animate);
+
+    // Attach downloadable video recorder
+    videoElement._getDownloadableBlob = function() {
+      return new Promise((resolve) => {
+        try {
+          const recStream = canvas.captureStream(30);
+          const mime = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported("video/webm;codecs=vp9"))
+            ? "video/webm;codecs=vp9"
+            : ((typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported("video/webm")) ? "video/webm" : "video/mp4");
+          const recorder = new MediaRecorder(recStream, { mimeType: mime });
+          const chunks = [];
+          recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+          recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: mime });
+            resolve(blob);
+          };
+          recorder.start();
+          setTimeout(() => recorder.stop(), 4000);
+        } catch {
+          resolve(null);
+        }
+      });
+    };
+  };
+
+  img.onerror = () => {
+    videoElement.poster = imageUrl;
+  };
+}
+
 function renderMessageDOM(role, text, isTyping = false, media = null) {
   if (welcomeScreen) welcomeScreen.style.display = "none";
 
@@ -375,7 +509,7 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
     content.innerHTML = formatContent(text);
 
     // If message contains media (image / video), render rich interactive card
-    if (media && media.url) {
+    if (media && (media.url || media.posterUrl)) {
       const mediaCard = document.createElement("div");
       mediaCard.className = "chat-media-card";
 
@@ -416,31 +550,35 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
           <div class="chat-media-header">
             <span class="chat-media-badge" style="color:var(--accent-purple);">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-              <span>AI Video</span>
+              <span>AI Video (Kinetic Motion)</span>
             </span>
             <span class="chat-media-prompt" title="${escapeHtml(media.prompt || '')}">${escapeHtml(media.prompt || '')}</span>
           </div>
           <div class="chat-media-preview-container">
-            ${media.url ? `
-              <video src="${media.url}" poster="${media.posterUrl || ''}" controls loop playsinline></video>
-            ` : `
-              <img src="${media.posterUrl}" alt="${escapeHtml(media.prompt || 'Generated AI video keyframe')}" />
-            `}
+            <video class="ai-generated-video" controls loop autoplay playsinline muted poster="${media.posterUrl || ''}"></video>
           </div>
           <div class="chat-media-actions">
             <button class="chat-media-btn copy-prompt-btn" type="button" title="Copy Prompt">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               <span>Copy Prompt</span>
             </button>
-            <button class="chat-media-btn primary download-media-btn" type="button" title="Download Video Clip">
+            <button class="chat-media-btn primary download-media-btn" type="button" title="Download Video">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-              <span>Download</span>
+              <span>Download Video</span>
             </button>
           </div>
         `;
 
+        const videoEl = mediaCard.querySelector(".ai-generated-video");
         const copyPromptBtn = mediaCard.querySelector(".copy-prompt-btn");
         const downloadBtn = mediaCard.querySelector(".download-media-btn");
+
+        if (media.url && (media.url.endsWith(".mp4") || media.url.endsWith(".webm") || media.url.endsWith(".ogv"))) {
+          videoEl.src = media.url;
+          videoEl.play().catch(() => {});
+        } else if (media.posterUrl) {
+          createAIVideoMotionStream(videoEl, media.posterUrl);
+        }
 
         copyPromptBtn.addEventListener("click", () => {
           navigator.clipboard.writeText(media.prompt || "").then(() => {
@@ -449,8 +587,29 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
           });
         });
 
-        downloadBtn.addEventListener("click", () => {
-          downloadMedia(media.url || media.posterUrl, `ai-video-${Date.now()}.${media.url ? 'mp4' : 'jpg'}`);
+        downloadBtn.addEventListener("click", async () => {
+          const orig = downloadBtn.innerHTML;
+          downloadBtn.innerHTML = `<span>Exporting video...</span>`;
+          if (media.url && (media.url.endsWith(".mp4") || media.url.endsWith(".webm"))) {
+            downloadMedia(media.url, `ai-video-${Date.now()}.mp4`);
+          } else if (typeof videoEl._getDownloadableBlob === "function") {
+            const blob = await videoEl._getDownloadableBlob();
+            if (blob) {
+              const bUrl = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = bUrl;
+              a.download = `ai-video-${Date.now()}.webm`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(bUrl), 1000);
+            } else {
+              downloadMedia(media.posterUrl, `ai-video-frame-${Date.now()}.jpg`);
+            }
+          } else {
+            downloadMedia(media.posterUrl, `ai-video-frame-${Date.now()}.jpg`);
+          }
+          downloadBtn.innerHTML = orig;
         });
       }
 
@@ -967,10 +1126,15 @@ generateVideoBtn?.addEventListener("click", async () => {
     if (!res.ok) throw new Error(data.error || "Video generation failed");
 
     lastGeneratedVideo = data;
-    videoResultPlayer.src = data.videoUrl || data.posterUrl;
-    videoResultPlayer.poster = data.posterUrl || "";
     videoResultBox.style.display = "block";
-    videoResultPlayer.play().catch(() => {});
+
+    if (data.videoUrl && (data.videoUrl.endsWith(".mp4") || data.videoUrl.endsWith(".webm") || data.videoUrl.endsWith(".ogv"))) {
+      videoResultPlayer.srcObject = null;
+      videoResultPlayer.src = data.videoUrl;
+      videoResultPlayer.play().catch(() => {});
+    } else if (data.posterUrl) {
+      createAIVideoMotionStream(videoResultPlayer, data.posterUrl);
+    }
   } catch (err) {
     alert("Video generation error: " + err.message);
   } finally {
@@ -981,11 +1145,31 @@ generateVideoBtn?.addEventListener("click", async () => {
   }
 });
 
-downloadVideoBtn?.addEventListener("click", () => {
-  if (lastGeneratedVideo) {
-    const url = lastGeneratedVideo.videoUrl || lastGeneratedVideo.posterUrl;
-    downloadMedia(url, `ai-video-${Date.now()}.${lastGeneratedVideo.videoUrl ? 'mp4' : 'jpg'}`);
+downloadVideoBtn?.addEventListener("click", async () => {
+  if (!lastGeneratedVideo) return;
+  const orig = downloadVideoBtn.innerHTML;
+  downloadVideoBtn.innerHTML = `<span>Exporting video...</span>`;
+
+  if (lastGeneratedVideo.videoUrl && (lastGeneratedVideo.videoUrl.endsWith(".mp4") || lastGeneratedVideo.videoUrl.endsWith(".webm"))) {
+    downloadMedia(lastGeneratedVideo.videoUrl, `ai-video-${Date.now()}.mp4`);
+  } else if (typeof videoResultPlayer._getDownloadableBlob === "function") {
+    const blob = await videoResultPlayer._getDownloadableBlob();
+    if (blob) {
+      const bUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = bUrl;
+      a.download = `ai-video-${Date.now()}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(bUrl), 1000);
+    } else {
+      downloadMedia(lastGeneratedVideo.posterUrl, `ai-video-frame-${Date.now()}.jpg`);
+    }
+  } else {
+    downloadMedia(lastGeneratedVideo.posterUrl, `ai-video-frame-${Date.now()}.jpg`);
   }
+  downloadVideoBtn.innerHTML = orig;
 });
 
 sendVideoChatBtn?.addEventListener("click", () => {
