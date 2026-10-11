@@ -125,6 +125,106 @@ async function callGemini(apiKey, safeMessages, timeInfo, liveWeatherInfo) {
   throw lastError || new Error("All fallback models are currently unavailable. Please try again shortly.");
 }
 
+// ==========================================================================
+// AI Image & Video Generation Engine
+// ==========================================================================
+
+const IMAGE_STYLES = {
+  photorealistic: "hyperrealistic 8k photo, natural lighting, sharp focus, masterpiece, highly detailed",
+  anime: "anime aesthetic, vibrant studio ghibli and makoto shinkai style, crisp lineart, digital illustration",
+  "3d": "3D digital render, Pixar and Unreal Engine 5 aesthetic, ray-traced shadows, smooth subsurface scattering",
+  cyberpunk: "cyberpunk sci-fi aesthetic, glowing neon colors, volumetric fog, futuristic night city, ultra-detailed",
+  cinematic: "cinematic film still, 35mm film photography, dramatic depth of field, anamorphic lens, IMAX quality",
+  fantasy: "epic fantasy digital painting, magical atmosphere, intricate detailing, ethereal lighting, concept art"
+};
+
+function getDimensions(aspectRatio) {
+  if (aspectRatio === "16:9") return { width: 1280, height: 720 };
+  if (aspectRatio === "9:16") return { width: 720, height: 1280 };
+  return { width: 1024, height: 1024 };
+}
+
+function buildImageUrl(prompt, style = "cinematic", aspectRatio = "1:1") {
+  const styleModifier = IMAGE_STYLES[style] || IMAGE_STYLES.cinematic;
+  const enhancedPrompt = `${prompt.trim()}, ${styleModifier}`;
+  const { width, height } = getDimensions(aspectRatio);
+  const seed = Math.floor(Math.random() * 10000000);
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=${width}&height=${height}&nologo=true&seed=${seed}&model=flux`;
+  return { imageUrl, enhancedPrompt, width, height, seed };
+}
+
+async function fetchVideoFromArchive(query) {
+  try {
+    const cleanQuery = query.replace(/[^\w\s]/gi, "").trim();
+    const searchTerms = cleanQuery.split(/\s+/).slice(0, 3).join(" ");
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(searchTerms)}%20filetype:video&gsrlimit=3&prop=imageinfo&iiprop=url|mime`;
+    const res = await fetch(url, { headers: { "User-Agent": "AIChatbox/2.0" } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const pages = Object.values(data.query?.pages || {});
+    for (const page of pages) {
+      const videoInfo = page.imageinfo?.[0];
+      if (videoInfo && videoInfo.url && (videoInfo.url.endsWith(".webm") || videoInfo.url.endsWith(".ogv") || videoInfo.url.endsWith(".mp4"))) {
+        return videoInfo.url;
+      }
+    }
+  } catch (err) {
+    console.warn("Video archive search error:", err.message);
+  }
+  return null;
+}
+
+app.post("/api/generate-image", (req, res) => {
+  try {
+    const { prompt, style = "cinematic", aspectRatio = "1:1" } = req.body;
+    if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({ error: "Please provide a prompt for image generation." });
+    }
+    const { imageUrl, enhancedPrompt, width, height, seed } = buildImageUrl(prompt, style, aspectRatio);
+    res.json({
+      success: true,
+      imageUrl,
+      prompt: prompt.trim(),
+      enhancedPrompt,
+      style,
+      aspectRatio,
+      width,
+      height,
+      seed
+    });
+  } catch (error) {
+    console.error("Image generation error:", error);
+    res.status(500).json({ error: "Failed to generate image. Please try again." });
+  }
+});
+
+app.post("/api/generate-video", async (req, res) => {
+  try {
+    const { prompt, motion = "cinematic", aspectRatio = "16:9" } = req.body;
+    if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({ error: "Please provide a prompt for video generation." });
+    }
+
+    const { imageUrl, enhancedPrompt, width, height } = buildImageUrl(prompt, "cinematic", aspectRatio);
+    const archiveVideoUrl = await fetchVideoFromArchive(prompt);
+
+    res.json({
+      success: true,
+      videoUrl: archiveVideoUrl || null,
+      posterUrl: imageUrl,
+      prompt: prompt.trim(),
+      enhancedPrompt,
+      motion,
+      aspectRatio,
+      width,
+      height
+    });
+  } catch (error) {
+    console.error("Video generation error:", error);
+    res.status(500).json({ error: "Failed to generate video. Please try again." });
+  }
+});
+
 app.post("/api/chat", async (req, res) => {
   try {
     if (!geminiApiKey) {
@@ -168,8 +268,46 @@ app.post("/api/chat", async (req, res) => {
     }
 
     const latestUserMessage = safeMessages[safeMessages.length - 1]?.content || "";
-    const liveWeatherInfo = await getLiveWeather(latestUserMessage);
 
+    // Detect image generation commands
+    const imageMatch = latestUserMessage.match(/^(?:\/image|image:)\s*(.+)/i) ||
+      latestUserMessage.match(/^(?:generate|create|make|draw|show)\s+(?:an?\s+)?image\s+(?:of|for|about)?\s*(.+)/i);
+
+    if (imageMatch && imageMatch[1]) {
+      const prompt = imageMatch[1].trim();
+      const { imageUrl, enhancedPrompt } = buildImageUrl(prompt, "cinematic", "1:1");
+      return res.json({
+        reply: `🎨 **Generated AI Image** for: *"${prompt}"*`,
+        media: {
+          type: "image",
+          url: imageUrl,
+          prompt: prompt,
+          enhancedPrompt: enhancedPrompt
+        }
+      });
+    }
+
+    // Detect video generation commands
+    const videoMatch = latestUserMessage.match(/^(?:\/video|video:)\s*(.+)/i) ||
+      latestUserMessage.match(/^(?:generate|create|make|produce|show)\s+(?:an?\s+)?video\s+(?:of|for|about)?\s*(.+)/i);
+
+    if (videoMatch && videoMatch[1]) {
+      const prompt = videoMatch[1].trim();
+      const { imageUrl, enhancedPrompt } = buildImageUrl(prompt, "cinematic", "16:9");
+      const archiveVideoUrl = await fetchVideoFromArchive(prompt);
+      return res.json({
+        reply: `🎬 **Generated AI Video** for: *"${prompt}"*`,
+        media: {
+          type: "video",
+          url: archiveVideoUrl || null,
+          posterUrl: imageUrl,
+          prompt: prompt,
+          enhancedPrompt: enhancedPrompt
+        }
+      });
+    }
+
+    const liveWeatherInfo = await getLiveWeather(latestUserMessage);
     const reply = await callGemini(geminiApiKey, safeMessages, timeInfo, liveWeatherInfo);
     res.json({ reply });
   } catch (error) {

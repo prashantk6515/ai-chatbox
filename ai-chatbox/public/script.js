@@ -259,7 +259,7 @@ function loadSession(sessionId) {
   if (welcomeScreen) welcomeScreen.style.display = "none";
 
   conversation.forEach(msg => {
-    renderMessageDOM(msg.role, msg.content);
+    renderMessageDOM(msg.role, msg.content, false, msg.media);
   });
 
   renderChatHistory();
@@ -344,7 +344,7 @@ function enhanceCodeBlocks(html) {
   return tempDiv.innerHTML;
 }
 
-function renderMessageDOM(role, text, isTyping = false) {
+function renderMessageDOM(role, text, isTyping = false, media = null) {
   if (welcomeScreen) welcomeScreen.style.display = "none";
 
   const row = document.createElement("div");
@@ -373,6 +373,89 @@ function renderMessageDOM(role, text, isTyping = false) {
     content.textContent = text;
   } else {
     content.innerHTML = formatContent(text);
+
+    // If message contains media (image / video), render rich interactive card
+    if (media && media.url) {
+      const mediaCard = document.createElement("div");
+      mediaCard.className = "chat-media-card";
+
+      if (media.type === "image") {
+        mediaCard.innerHTML = `
+          <div class="chat-media-header">
+            <span class="chat-media-badge">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>AI Image</span>
+            </span>
+            <span class="chat-media-prompt" title="${escapeHtml(media.prompt || '')}">${escapeHtml(media.prompt || '')}</span>
+          </div>
+          <div class="chat-media-preview-container">
+            <img src="${media.url}" alt="${escapeHtml(media.prompt || 'Generated AI image')}" loading="lazy" />
+          </div>
+          <div class="chat-media-actions">
+            <button class="chat-media-btn open-lightbox-btn" type="button" title="View Fullscreen">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              <span>Zoom</span>
+            </button>
+            <button class="chat-media-btn primary download-media-btn" type="button" title="Download Image">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              <span>Download</span>
+            </button>
+          </div>
+        `;
+
+        const imgEl = mediaCard.querySelector("img");
+        const zoomBtn = mediaCard.querySelector(".open-lightbox-btn");
+        const downloadBtn = mediaCard.querySelector(".download-media-btn");
+
+        const openZoom = () => openLightbox(media.url, media.prompt || "AI Artwork");
+        imgEl.addEventListener("click", openZoom);
+        zoomBtn.addEventListener("click", openZoom);
+        downloadBtn.addEventListener("click", () => downloadMedia(media.url, `ai-image-${Date.now()}.jpg`));
+      } else if (media.type === "video") {
+        mediaCard.innerHTML = `
+          <div class="chat-media-header">
+            <span class="chat-media-badge" style="color:var(--accent-purple);">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+              <span>AI Video</span>
+            </span>
+            <span class="chat-media-prompt" title="${escapeHtml(media.prompt || '')}">${escapeHtml(media.prompt || '')}</span>
+          </div>
+          <div class="chat-media-preview-container">
+            ${media.url ? `
+              <video src="${media.url}" poster="${media.posterUrl || ''}" controls loop playsinline></video>
+            ` : `
+              <img src="${media.posterUrl}" alt="${escapeHtml(media.prompt || 'Generated AI video keyframe')}" />
+            `}
+          </div>
+          <div class="chat-media-actions">
+            <button class="chat-media-btn copy-prompt-btn" type="button" title="Copy Prompt">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>Copy Prompt</span>
+            </button>
+            <button class="chat-media-btn primary download-media-btn" type="button" title="Download Video Clip">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              <span>Download</span>
+            </button>
+          </div>
+        `;
+
+        const copyPromptBtn = mediaCard.querySelector(".copy-prompt-btn");
+        const downloadBtn = mediaCard.querySelector(".download-media-btn");
+
+        copyPromptBtn.addEventListener("click", () => {
+          navigator.clipboard.writeText(media.prompt || "").then(() => {
+            copyPromptBtn.querySelector("span").textContent = "Copied!";
+            setTimeout(() => copyPromptBtn.querySelector("span").textContent = "Copy Prompt", 1800);
+          });
+        });
+
+        downloadBtn.addEventListener("click", () => {
+          downloadMedia(media.url || media.posterUrl, `ai-video-${Date.now()}.${media.url ? 'mp4' : 'jpg'}`);
+        });
+      }
+
+      content.appendChild(mediaCard);
+    }
   }
 
   body.appendChild(content);
@@ -483,8 +566,8 @@ async function sendMessage(text) {
     if (!response.ok) throw new Error(data.error || "The model request failed.");
 
     typingRow.remove();
-    conversation.push({ role: "assistant", content: data.reply });
-    renderMessageDOM("assistant", data.reply);
+    conversation.push({ role: "assistant", content: data.reply, media: data.media });
+    renderMessageDOM("assistant", data.reply, false, data.media);
     saveCurrentSession();
   } catch (error) {
     typingRow.remove();
@@ -613,19 +696,19 @@ function resetChat() {
           </div>
           <span class="card-arrow">→</span>
         </button>
-        <button class="suggestion-card" data-prompt="Write a modern JavaScript debounce and throttle implementation with TypeScript types.">
-          <div class="card-icon code">💻</div>
+        <button class="suggestion-card" data-prompt="/image Cyberpunk cat with neon sunglasses in rainy Tokyo, highly detailed, 8k">
+          <div class="card-icon" style="background:rgba(99,102,241,0.15);color:var(--accent-indigo);">🎨</div>
           <div class="card-content">
-            <div class="card-title">Clean Code</div>
-            <div class="card-desc">Write a JS debounce &amp; throttle utility</div>
+            <div class="card-title">Generate AI Image</div>
+            <div class="card-desc">Cyberpunk cat with neon sunglasses in Tokyo</div>
           </div>
           <span class="card-arrow">→</span>
         </button>
-        <button class="suggestion-card" data-prompt="Explain quantum computing principles simply with a real-world analogy.">
-          <div class="card-icon idea">💡</div>
+        <button class="suggestion-card" data-prompt="/video Deep space rotating cosmic galaxy with shimmering nebula clouds">
+          <div class="card-icon" style="background:rgba(192,132,252,0.15);color:var(--accent-purple);">🎬</div>
           <div class="card-content">
-            <div class="card-title">Concept Deep-Dive</div>
-            <div class="card-desc">Explain quantum computing simply</div>
+            <div class="card-title">Generate AI Video</div>
+            <div class="card-desc">Deep space rotating cosmic galaxy nebula</div>
           </div>
           <span class="card-arrow">→</span>
         </button>
@@ -663,6 +746,263 @@ if (pinCurrentBtn) {
     }
   });
 }
+
+// Download Media Helper
+async function downloadMedia(url, defaultName = "gemini-ai-creation.png") {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = defaultName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  } catch {
+    window.open(url, "_blank");
+  }
+}
+
+// Lightbox Modal Controls
+const imageLightboxModal = document.querySelector("#image-lightbox-modal");
+const lightboxImg = document.querySelector("#lightbox-img");
+const lightboxCaption = document.querySelector("#lightbox-caption");
+const lightboxDownloadBtn = document.querySelector("#lightbox-download-btn");
+const closeLightboxBtn = document.querySelector("#close-lightbox-btn");
+
+function openLightbox(imageUrl, caption) {
+  if (!imageLightboxModal) return;
+  lightboxImg.src = imageUrl;
+  lightboxCaption.textContent = caption || "";
+  imageLightboxModal.style.display = "flex";
+  lightboxDownloadBtn.onclick = () => downloadMedia(imageUrl, `ai-artwork-${Date.now()}.jpg`);
+}
+
+function closeLightbox() {
+  if (imageLightboxModal) imageLightboxModal.style.display = "none";
+}
+
+closeLightboxBtn?.addEventListener("click", closeLightbox);
+imageLightboxModal?.addEventListener("click", (e) => {
+  if (e.target === imageLightboxModal) closeLightbox();
+});
+
+// ==========================================================================
+// AI Media Studio Modal Controls
+// ==========================================================================
+
+const mediaStudioModal = document.querySelector("#media-studio-modal");
+const openStudioBtn = document.querySelector("#open-studio-btn");
+const closeStudioBtn = document.querySelector("#close-studio-btn");
+const quickImageBtn = document.querySelector("#quick-image-btn");
+const quickVideoBtn = document.querySelector("#quick-video-btn");
+
+function openStudio(tabName = "image-tab") {
+  if (!mediaStudioModal) return;
+  mediaStudioModal.style.display = "flex";
+  switchStudioTab(tabName);
+  if (window.innerWidth < 820) sidebar?.classList.add("collapsed");
+}
+
+function closeStudio() {
+  if (mediaStudioModal) mediaStudioModal.style.display = "none";
+}
+
+openStudioBtn?.addEventListener("click", () => openStudio("image-tab"));
+quickImageBtn?.addEventListener("click", () => openStudio("image-tab"));
+quickVideoBtn?.addEventListener("click", () => openStudio("video-tab"));
+closeStudioBtn?.addEventListener("click", closeStudio);
+mediaStudioModal?.addEventListener("click", (e) => {
+  if (e.target === mediaStudioModal) closeStudio();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeStudio();
+    closeLightbox();
+  }
+});
+
+// Tab Switcher
+function switchStudioTab(tabId) {
+  document.querySelectorAll(".studio-tab-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tabId);
+  });
+  document.querySelectorAll(".studio-tab-panel").forEach(panel => {
+    panel.classList.toggle("active", panel.id === tabId);
+  });
+}
+
+document.querySelectorAll(".studio-tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => switchStudioTab(btn.dataset.tab));
+});
+
+// Option Pills Selection Helper
+function setupOptionGroup(groupId) {
+  const group = document.querySelector(`#${groupId}`);
+  if (!group) return;
+  group.addEventListener("click", (e) => {
+    const pill = e.target.closest(".option-pill");
+    if (!pill) return;
+    group.querySelectorAll(".option-pill").forEach(p => p.classList.remove("active"));
+    pill.classList.add("active");
+  });
+}
+
+setupOptionGroup("image-style-group");
+setupOptionGroup("image-aspect-group");
+setupOptionGroup("video-motion-group");
+setupOptionGroup("video-aspect-group");
+
+// Inspiration Chips Fill
+document.querySelectorAll(".chip-btn").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const text = chip.dataset.fill;
+    const parentPanel = chip.closest(".studio-tab-panel");
+    const textarea = parentPanel?.querySelector(".studio-textarea");
+    if (textarea) {
+      textarea.value = text;
+      textarea.focus();
+    }
+  });
+});
+
+// Generate Image Logic
+const generateImageBtn = document.querySelector("#generate-image-btn");
+const imagePromptInput = document.querySelector("#image-prompt-input");
+const imageResultBox = document.querySelector("#image-result-box");
+const imageResultPreview = document.querySelector("#image-result-preview");
+const downloadImageBtn = document.querySelector("#download-image-btn");
+const sendImageChatBtn = document.querySelector("#send-image-chat-btn");
+let lastGeneratedImage = null;
+
+generateImageBtn?.addEventListener("click", async () => {
+  const prompt = imagePromptInput.value.trim();
+  if (!prompt) {
+    imagePromptInput.focus();
+    return;
+  }
+
+  const selectedStyle = document.querySelector("#image-style-group .option-pill.active")?.dataset.val || "cinematic";
+  const selectedAspect = document.querySelector("#image-aspect-group .option-pill.active")?.dataset.val || "1:1";
+
+  generateImageBtn.disabled = true;
+  generateImageBtn.innerHTML = `<span>Synthesizing High-Res Image...</span>`;
+
+  try {
+    const res = await fetch("/api/generate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, style: selectedStyle, aspectRatio: selectedAspect })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Image creation failed");
+
+    lastGeneratedImage = data;
+    imageResultPreview.src = data.imageUrl;
+    imageResultBox.style.display = "block";
+    imageResultPreview.onclick = () => openLightbox(data.imageUrl, prompt);
+  } catch (err) {
+    alert("Image generation error: " + err.message);
+  } finally {
+    generateImageBtn.disabled = false;
+    generateImageBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+      <span>Generate Image</span>`;
+  }
+});
+
+downloadImageBtn?.addEventListener("click", () => {
+  if (lastGeneratedImage?.imageUrl) {
+    downloadMedia(lastGeneratedImage.imageUrl, `ai-art-${Date.now()}.jpg`);
+  }
+});
+
+sendImageChatBtn?.addEventListener("click", () => {
+  if (!lastGeneratedImage?.imageUrl) return;
+  closeStudio();
+  const replyText = `🎨 **AI Artwork created in Studio:** *"${lastGeneratedImage.prompt}"*`;
+  const mediaObj = {
+    type: "image",
+    url: lastGeneratedImage.imageUrl,
+    prompt: lastGeneratedImage.prompt,
+    enhancedPrompt: lastGeneratedImage.enhancedPrompt
+  };
+  conversation.push({ role: "assistant", content: replyText, media: mediaObj });
+  renderMessageDOM("assistant", replyText, false, mediaObj);
+  saveCurrentSession();
+});
+
+// Generate Video Logic
+const generateVideoBtn = document.querySelector("#generate-video-btn");
+const videoPromptInput = document.querySelector("#video-prompt-input");
+const videoResultBox = document.querySelector("#video-result-box");
+const videoResultPlayer = document.querySelector("#video-result-player");
+const downloadVideoBtn = document.querySelector("#download-video-btn");
+const sendVideoChatBtn = document.querySelector("#send-video-chat-btn");
+let lastGeneratedVideo = null;
+
+generateVideoBtn?.addEventListener("click", async () => {
+  const prompt = videoPromptInput.value.trim();
+  if (!prompt) {
+    videoPromptInput.focus();
+    return;
+  }
+
+  const selectedMotion = document.querySelector("#video-motion-group .option-pill.active")?.dataset.val || "cinematic";
+  const selectedAspect = document.querySelector("#video-aspect-group .option-pill.active")?.dataset.val || "16:9";
+
+  generateVideoBtn.disabled = true;
+  generateVideoBtn.innerHTML = `<span>Rendering AI Video Clip...</span>`;
+
+  try {
+    const res = await fetch("/api/generate-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, motion: selectedMotion, aspectRatio: selectedAspect })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Video generation failed");
+
+    lastGeneratedVideo = data;
+    videoResultPlayer.src = data.videoUrl || data.posterUrl;
+    videoResultPlayer.poster = data.posterUrl || "";
+    videoResultBox.style.display = "block";
+    videoResultPlayer.play().catch(() => {});
+  } catch (err) {
+    alert("Video generation error: " + err.message);
+  } finally {
+    generateVideoBtn.disabled = false;
+    generateVideoBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+      <span>Generate Video</span>`;
+  }
+});
+
+downloadVideoBtn?.addEventListener("click", () => {
+  if (lastGeneratedVideo) {
+    const url = lastGeneratedVideo.videoUrl || lastGeneratedVideo.posterUrl;
+    downloadMedia(url, `ai-video-${Date.now()}.${lastGeneratedVideo.videoUrl ? 'mp4' : 'jpg'}`);
+  }
+});
+
+sendVideoChatBtn?.addEventListener("click", () => {
+  if (!lastGeneratedVideo) return;
+  closeStudio();
+  const replyText = `🎬 **AI Video created in Studio:** *"${lastGeneratedVideo.prompt}"*`;
+  const mediaObj = {
+    type: "video",
+    url: lastGeneratedVideo.videoUrl,
+    posterUrl: lastGeneratedVideo.posterUrl,
+    prompt: lastGeneratedVideo.prompt,
+    enhancedPrompt: lastGeneratedVideo.enhancedPrompt
+  };
+  conversation.push({ role: "assistant", content: replyText, media: mediaObj });
+  renderMessageDOM("assistant", replyText, false, mediaObj);
+  saveCurrentSession();
+});
 
 // Initialize App
 initTheme();
