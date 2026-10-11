@@ -131,12 +131,12 @@ async function callGemini(apiKey, safeMessages, timeInfo, liveWeatherInfo) {
 // ==========================================================================
 
 const IMAGE_STYLES = {
-  photorealistic: "masterpiece modern 8k photography, shot on Hasselblad H6D-100c, 85mm f/1.4 lens, razor-sharp focus, volumetric cinematic lighting, radiant vivid colors, hyper-detailed micro-textures, lifelike depth, award-winning photography, no vintage, no sepia, no faded retro grain, no outdated illustration",
-  cinematic: "modern Hollywood cinematic film still, shot on Arri Alexa 65 with anamorphic lens, dramatic volumetric rim lighting, IMAX 8k resolution, razor-sharp textures, modern cinematic color grading, photorealistic, atmospheric depth",
-  anime: "modern high-budget anime masterpiece, Makoto Shinkai and Ufotable style, vibrant luminous colors, razor-sharp digital line art, breathtaking cinematic lighting, 8k digital artwork",
-  "3d": "modern Pixar and Unreal Engine 5.4 3D cinematic render, ray-traced global illumination, subsurface scattering, volumetric studio lighting, hyper-detailed 8k",
-  cyberpunk: "futuristic modern cyberpunk aesthetic, ultra-sharp detail, vibrant neon reflections, volumetric rain and atmospheric fog, 8k cinematic photography, Blade Runner 2049 modern aesthetic",
-  fantasy: "modern epic fantasy digital masterpiece, intricate ornate detailing, ethereal radiant lighting, cinematic composition, 8k concept art, vibrant colors"
+  photorealistic: "modern contemporary photo, vibrant colors, glowing natural lighting, fine details, contemporary 2026 aesthetic, no vintage",
+  cinematic: "contemporary Hollywood movie still, dramatic lighting, rich color grading, modern visual effects",
+  anime: "modern vibrant anime artwork, luminous colors, crisp line art, beautiful digital art",
+  "3d": "modern 3D animation studio render, smooth lighting, rich textures, contemporary styling",
+  cyberpunk: "modern cyberpunk night city, vibrant neon reflections, futuristic styling",
+  fantasy: "modern epic fantasy artwork, glowing magic aura, intricate golden details"
 };
 
 function getDimensions(aspectRatio) {
@@ -153,26 +153,26 @@ async function expandPromptWithAI(rawPrompt, style = "photorealistic") {
   if (geminiApiKey) {
     const modelsToTry = [...new Set(GEMINI_MODELS)];
     const styleGuide = style === "cinematic"
-      ? "cinematic modern Hollywood film still shot on Arri Alexa with anamorphic lens and volumetric lighting"
+      ? "contemporary Hollywood film style, rich color grading, modern visual effects"
       : style === "anime"
-      ? "modern vibrant high-budget anime film still in Makoto Shinkai and Ufotable aesthetic"
+      ? "vibrant high-budget modern anime film style in Makoto Shinkai and Ufotable aesthetic"
       : style === "3d"
-      ? "modern Pixar and Unreal Engine 5.4 3D render with ray-traced subsurface scattering"
+      ? "Pixar and modern 3D animation render with soft lighting"
       : style === "cyberpunk"
-      ? "modern futuristic cyberpunk photography with sharp neon reflections and atmospheric haze"
+      ? "futuristic cyberpunk night city with glowing neon reflections"
       : style === "fantasy"
-      ? "modern epic fantasy digital masterpiece with luminous divine aura and intricate detailing"
-      : "modern ultra-realistic 8k photograph shot on Hasselblad H6D-100c with 85mm f/1.4 lens, hyper-realistic skin textures, sharp focus, volumetric lighting, and vivid vibrant colors";
+      ? "epic fantasy digital concept art with luminous celestial aura"
+      : "contemporary modern photograph, natural vivid colors, authentic textures, contemporary aesthetic";
 
     const systemPrompt = [
-      "You are the expert prompt engineering engine for DALL-E 3 in ChatGPT.",
-      "Your mission is to rewrite user image requests into ultra-detailed, modern, breathtaking visual prompts that look state-of-the-art.",
+      "You are the expert prompt engineering engine for modern state-of-the-art visual generation (like modern ChatGPT DALL-E 3).",
+      "Your mission is to rewrite user image requests into ultra-modern, contemporary, fresh visual prompts ('nowadays look') that look cutting-edge.",
       "CRITICAL AESTHETIC DIRECTIVES:",
-      "1. The image MUST look MODERN, CRISP, HIGH-RESOLUTION 8k, and VIBRANT like modern ChatGPT DALL-E 3.",
-      "2. Absolutely NEVER produce vintage, faded, sepia, antique lithograph, retro, or 19th-century calendar art looks unless explicitly asked.",
-      "3. If depicting deities, mythological entities, or sacred figures (e.g. Maa Kali, Durga, Shiva, Krishna, Zeus, Buddha), depict them in divine radiant glory, luminous glowing golden aura, photorealistic anatomy, expressive eyes, hyper-detailed polished gold jewelry and garments, and cinematic volumetric lighting.",
-      "4. Regardless of input language (Hindi, Hinglish, Spanish, English, etc.), translate and produce the rewritten prompt in fluent, descriptive English.",
-      "5. Target length: 45 to 70 words.",
+      "1. The image MUST look MODERN, CONTEMPORARY 2026, and VIBRANT. Avoid any antique, 19th-century calendar, vintage lithograph, or retro faded looks.",
+      "2. If depicting deities or sacred figures (e.g. Maa Kali, Durga, Shiva), depict them with modern divine majesty, luminous glowing blue or golden celestial aura, polished solid gold jewelry and crown, royal robes, contemporary cinema CGI visual effects.",
+      "3. For general subjects (people, cars, cities), use modern contemporary fashion, current-year styling, sleek design.",
+      "4. Do NOT use any of these forbidden words: 'cinematic', 'sharp', '8k', 'hyper-realistic', 'photorealistic', 'portrait', 'volumetric', 'supercar'. Instead describe lighting, color, mood, and subject with vivid natural language.",
+      "5. Keep the prompt concise: between 20 and 35 words.",
       `6. Style guidance: ${styleGuide}.`,
       "7. Output ONLY the rewritten English prompt. Do not add quotes, markdown formatting, or preamble."
     ].join(" ");
@@ -211,15 +211,13 @@ async function expandPromptWithAI(rawPrompt, style = "photorealistic") {
 
   // Fallback high-end enhancer if AI prompt expander is offline
   const styleModifier = IMAGE_STYLES[style] || IMAGE_STYLES.photorealistic;
-  return `${cleanPrompt}, ${styleModifier}, modern aesthetic, ultra-detailed 8k UHD, crisp sharpness, vivid vibrant colors, studio volumetric lighting, photorealistic masterpiece, no vintage, no sepia, no faded retro`;
+  return `${cleanPrompt}, ${styleModifier}, modern contemporary look, vibrant colors, glowing background aura`;
 }
 
-function buildImageUrl(enhancedPrompt, style = "photorealistic", aspectRatio = "1:1") {
+function buildImageUrl(enhancedPrompt, style = "photorealistic") {
   const cleanPrompt = enhancedPrompt.replace(/^["'`]|["'`]$/g, "").trim();
-  const { width, height } = getDimensions(aspectRatio);
-  const seed = Math.floor(Math.random() * 100000000);
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=${width}&height=${height}&nologo=true&seed=${seed}&model=flux-realism&enhance=true`;
-  return { imageUrl, enhancedPrompt: cleanPrompt, width, height, seed };
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?model=flux`;
+  return { imageUrl, enhancedPrompt: cleanPrompt };
 }
 
 function extractImageRequest(text) {
