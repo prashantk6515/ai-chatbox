@@ -22,13 +22,6 @@ const micBtn = document.querySelector("#mic-btn");
 const scrollBottomBtn = document.querySelector("#scroll-bottom-btn");
 const chatHistoryList = document.querySelector("#chat-history-list");
 
-// Music Player DOM Elements
-const musicPlayerWidget = document.querySelector("#music-player-widget");
-const musicToggleBtn = document.querySelector("#music-toggle-btn");
-const musicPlayIcon = document.querySelector("#music-play-icon");
-const musicPauseIcon = document.querySelector("#music-pause-icon");
-const html5Audio = document.querySelector("#html5-audio");
-
 // State Management
 let currentChatId = Date.now().toString();
 let conversation = [];
@@ -36,76 +29,6 @@ let chatSessions = JSON.parse(localStorage.getItem("gemini_chat_sessions") || "[
 let isWaitingForReply = false;
 let speechRecognizer = null;
 let isRecording = false;
-
-// ==========================================================================
-// Ambient Background Music ("Mujhko Barsaat Bana Lo")
-// ==========================================================================
-
-const cardMusicToggle = document.querySelector("#card-music-toggle");
-const cardPlayIcon = document.querySelector("#card-play-icon");
-const cardPauseIcon = document.querySelector("#card-pause-icon");
-
-let isMusicPlaying = false;
-let hasUserInteracted = false;
-
-function sendYtCommand(func, args = "") {
-  const iframe = document.getElementById("yt-embed-player");
-  if (iframe && iframe.contentWindow) {
-    iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: func, args: args }), "*");
-  }
-}
-
-function updateMusicUI(playing) {
-  isMusicPlaying = playing;
-  if (playing) {
-    musicPlayerWidget?.classList.add("playing");
-    if (musicPlayIcon) musicPlayIcon.style.display = "none";
-    if (musicPauseIcon) musicPauseIcon.style.display = "block";
-    if (cardPlayIcon) cardPlayIcon.style.display = "none";
-    if (cardPauseIcon) cardPauseIcon.style.display = "block";
-  } else {
-    musicPlayerWidget?.classList.remove("playing");
-    if (musicPlayIcon) musicPlayIcon.style.display = "block";
-    if (musicPauseIcon) musicPauseIcon.style.display = "none";
-    if (cardPlayIcon) cardPlayIcon.style.display = "block";
-    if (cardPauseIcon) cardPauseIcon.style.display = "none";
-  }
-}
-
-function playMusic() {
-  sendYtCommand("playVideo");
-  updateMusicUI(true);
-}
-
-function pauseMusic() {
-  sendYtCommand("pauseVideo");
-  updateMusicUI(false);
-}
-
-function toggleMusic() {
-  if (isMusicPlaying) {
-    pauseMusic();
-  } else {
-    playMusic();
-  }
-}
-
-musicPlayerWidget?.addEventListener("click", toggleMusic);
-cardMusicToggle?.addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleMusic();
-});
-
-// Autoplay on first user interaction with the chatbox
-function triggerMusicOnFirstInteraction() {
-  if (hasUserInteracted) return;
-  hasUserInteracted = true;
-  playMusic();
-}
-
-window.addEventListener("click", triggerMusicOnFirstInteraction, { passive: true });
-window.addEventListener("keydown", triggerMusicOnFirstInteraction, { passive: true });
-window.addEventListener("touchstart", triggerMusicOnFirstInteraction, { passive: true });
 
 // Initialize Marked Options
 if (window.marked) {

@@ -52,30 +52,7 @@
         <!-- Rendered dynamically via JS -->
       </div>
 
-      <!-- Ambient Music Player Tile in Sidebar -->
-      <div id="sidebar-music-card" class="sidebar-music-card">
-        <div class="music-card-header">
-          <div class="music-card-info">
-            <span class="music-badge">Background Track</span>
-            <span class="music-card-title">Mujhko Barsaat Bana Lo</span>
-            <span class="music-card-artist">Armaan Malik · Junooniyat</span>
-          </div>
-          <button id="card-music-toggle" class="music-ctrl-btn" type="button" aria-label="Play / Pause">
-            <svg id="card-play-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            <svg id="card-pause-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-          </button>
-        </div>
-        <div class="music-embed-container">
-          <iframe
-            id="yt-embed-player"
-            src="https://www.youtube-nocookie.com/embed/sR81J1-2N1o?enablejsapi=1&autoplay=0&loop=1&playlist=sR81J1-2N1o"
-            title="Mujhko Barsaat Bana Lo"
-            frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-          ></iframe>
-        </div>
-      </div>
+
 
       <div class="sidebar-footer">
         <div class="system-status-card">
@@ -107,23 +84,6 @@
         </div>
 
         <div class="topbar-right">
-          <!-- Ambient Music Player Widget -->
-          <div id="music-player-widget" class="music-player-pill" title="Now Playing: Mujhko Barsaat Bana Lo">
-            <div class="music-equalizer" id="music-equalizer">
-              <span class="eq-bar"></span>
-              <span class="eq-bar"></span>
-              <span class="eq-bar"></span>
-              <span class="eq-bar"></span>
-            </div>
-            <div class="music-info">
-              <span class="music-title">Mujhko Barsaat Bana Lo</span>
-              <span class="music-artist">Armaan Malik · Junooniyat</span>
-            </div>
-            <button id="music-toggle-btn" class="music-ctrl-btn" type="button" aria-label="Toggle Music" title="Play / Pause">
-              <svg id="music-play-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              <svg id="music-pause-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-            </button>
-          </div>
 
           <!-- Live Clock Pill -->
           <div id="live-clock" class="live-clock-pill" title="Current Local Time">
@@ -247,8 +207,6 @@
       </div>
     </main>
   </div>
-  <!-- Hidden Background Music Players -->
-  <div id="youtube-audio-player" style="position:fixed;bottom:-999px;left:-999px;width:1px;height:1px;pointer-events:none;"></div>
-  <audio id="html5-audio" loop preload="none"></audio>
+
 </body>
 </html>
