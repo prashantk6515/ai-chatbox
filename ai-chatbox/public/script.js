@@ -516,16 +516,16 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
       if (media.type === "image") {
         mediaCard.innerHTML = `
           <div class="chat-media-header">
-            <span class="chat-media-badge">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-              <span>Realistic AI Image</span>
+            <span class="chat-media-badge" style="background: rgba(99, 102, 241, 0.15); color: var(--accent-indigo); border: 1px solid rgba(99, 102, 241, 0.25);">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+              <span>DALL·E 3 Photorealism</span>
             </span>
             <span class="chat-media-prompt" title="${escapeHtml(media.prompt || '')}">${escapeHtml(media.prompt || '')}</span>
           </div>
           <div class="chat-media-preview-container">
             <div class="media-loading-placeholder">
               <div class="media-spinner"></div>
-              <span>Generating Realistic AI Artwork...</span>
+              <span>Synthesizing Ultra-Realistic AI Masterpiece...</span>
             </div>
             <img src="${media.url}" alt="${escapeHtml(media.prompt || 'Generated AI image')}" loading="eager" style="opacity: 0; transition: opacity 0.4s ease;" />
           </div>
@@ -533,6 +533,10 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
             <button class="chat-media-btn open-lightbox-btn" type="button" title="View Fullscreen">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
               <span>Zoom</span>
+            </button>
+            <button class="chat-media-btn copy-image-prompt-btn" type="button" title="Copy Prompt">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>Copy Prompt</span>
             </button>
             <button class="chat-media-btn primary download-media-btn" type="button" title="Download Image">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -544,6 +548,7 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
         const imgEl = mediaCard.querySelector("img");
         const placeholder = mediaCard.querySelector(".media-loading-placeholder");
         const zoomBtn = mediaCard.querySelector(".open-lightbox-btn");
+        const copyImgPromptBtn = mediaCard.querySelector(".copy-image-prompt-btn");
         const downloadBtn = mediaCard.querySelector(".download-media-btn");
 
         imgEl.onload = () => {
@@ -558,7 +563,7 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
               <button class="chat-media-btn retry-btn" type="button" style="margin-top:6px;">Retry Loading</button>
             `;
             placeholder.querySelector(".retry-btn")?.addEventListener("click", () => {
-              placeholder.innerHTML = `<div class="media-spinner"></div><span>Synthesizing Realistic AI Artwork...</span>`;
+              placeholder.innerHTML = `<div class="media-spinner"></div><span>Synthesizing Ultra-Realistic Artwork...</span>`;
               imgEl.src = media.url + "&retry=" + Date.now();
             });
           }
@@ -567,6 +572,14 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
         const openZoom = () => openLightbox(media.url, media.prompt || "Realistic AI Artwork");
         imgEl.addEventListener("click", openZoom);
         zoomBtn.addEventListener("click", openZoom);
+
+        copyImgPromptBtn?.addEventListener("click", () => {
+          navigator.clipboard.writeText(media.enhancedPrompt || media.prompt || "").then(() => {
+            copyImgPromptBtn.querySelector("span").textContent = "Copied!";
+            setTimeout(() => copyImgPromptBtn.querySelector("span").textContent = "Copy Prompt", 1800);
+          });
+        });
+
         downloadBtn.addEventListener("click", () => downloadMedia(media.url, `ai-image-${Date.now()}.jpg`));
       } else if (media.type === "video") {
         mediaCard.innerHTML = `
@@ -1071,7 +1084,7 @@ generateImageBtn?.addEventListener("click", async () => {
   const selectedAspect = document.querySelector("#image-aspect-group .option-pill.active")?.dataset.val || "1:1";
 
   generateImageBtn.disabled = true;
-  generateImageBtn.innerHTML = `<span>Synthesizing High-Res Image...</span>`;
+  generateImageBtn.innerHTML = `<span>✨ Synthesizing DALL·E 3 Vision...</span>`;
 
   try {
     const res = await fetch("/api/generate-image", {
@@ -1086,6 +1099,12 @@ generateImageBtn?.addEventListener("click", async () => {
     imageResultPreview.src = data.imageUrl;
     imageResultBox.style.display = "block";
     imageResultPreview.onclick = () => openLightbox(data.imageUrl, prompt);
+
+    const promptDetails = document.querySelector("#image-prompt-details");
+    if (promptDetails && data.enhancedPrompt) {
+      promptDetails.innerHTML = `<strong>✨ DALL·E 3 Enriched Vision:</strong> ${escapeHtml(data.enhancedPrompt)}`;
+      promptDetails.style.display = "block";
+    }
   } catch (err) {
     alert("Image generation error: " + err.message);
   } finally {

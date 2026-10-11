@@ -22,9 +22,9 @@ const geminiApiKey = process.env.GEMINI_API_KEY;
 
 const GEMINI_MODELS = [
   process.env.GEMINI_MODEL,
-  "gemini-3.5-flash",
   "gemini-3.1-flash-lite",
   "gemini-flash-lite-latest",
+  "gemini-3.5-flash",
   "gemini-3-flash-preview",
   "gemma-4-26b-a4b-it"
 ].filter(Boolean);
@@ -127,16 +127,16 @@ async function callGemini(apiKey, safeMessages, timeInfo, liveWeatherInfo) {
 }
 
 // ==========================================================================
-// AI Image & Video Generation Engine (Ultra-Realistic)
+// AI Image & Video Generation Engine (DALL·E 3 Quality & Photorealism)
 // ==========================================================================
 
 const IMAGE_STYLES = {
-  photorealistic: "ultra-realistic 8k photograph, highly detailed masterpiece, authentic fine textures, hyperrealistic natural cinematic lighting, professional 85mm lens portrait photography, photorealistic skin and fabric textures, volumetric lighting, sharp focus, award-winning photography, true-to-life colors",
-  cinematic: "cinematic film still, 35mm film photography, dramatic depth of field, anamorphic lens, IMAX quality, hyperrealistic lighting, 8k resolution, photorealistic",
-  anime: "anime aesthetic, vibrant studio ghibli and makoto shinkai style, crisp lineart, digital illustration, masterpiece",
-  "3d": "3D digital render, Pixar and Unreal Engine 5 aesthetic, ray-traced shadows, smooth subsurface scattering, 8k",
-  cyberpunk: "cyberpunk sci-fi aesthetic, glowing neon colors, volumetric fog, futuristic night city, ultra-detailed, 8k, photorealistic",
-  fantasy: "epic fantasy digital painting, magical atmosphere, intricate detailing, ethereal lighting, concept art, masterpiece"
+  photorealistic: "masterpiece modern 8k photography, shot on Hasselblad H6D-100c, 85mm f/1.4 lens, razor-sharp focus, volumetric cinematic lighting, radiant vivid colors, hyper-detailed micro-textures, lifelike depth, award-winning photography, no vintage, no sepia, no faded retro grain, no outdated illustration",
+  cinematic: "modern Hollywood cinematic film still, shot on Arri Alexa 65 with anamorphic lens, dramatic volumetric rim lighting, IMAX 8k resolution, razor-sharp textures, modern cinematic color grading, photorealistic, atmospheric depth",
+  anime: "modern high-budget anime masterpiece, Makoto Shinkai and Ufotable style, vibrant luminous colors, razor-sharp digital line art, breathtaking cinematic lighting, 8k digital artwork",
+  "3d": "modern Pixar and Unreal Engine 5.4 3D cinematic render, ray-traced global illumination, subsurface scattering, volumetric studio lighting, hyper-detailed 8k",
+  cyberpunk: "futuristic modern cyberpunk aesthetic, ultra-sharp detail, vibrant neon reflections, volumetric rain and atmospheric fog, 8k cinematic photography, Blade Runner 2049 modern aesthetic",
+  fantasy: "modern epic fantasy digital masterpiece, intricate ornate detailing, ethereal radiant lighting, cinematic composition, 8k concept art, vibrant colors"
 };
 
 function getDimensions(aspectRatio) {
@@ -145,14 +145,81 @@ function getDimensions(aspectRatio) {
   return { width: 1024, height: 1024 };
 }
 
-function buildImageUrl(prompt, style = "photorealistic", aspectRatio = "1:1") {
-  const cleanPrompt = prompt.replace(/^["'`]|["'`]$/g, "").trim();
+// Expands user prompts into modern ChatGPT DALL-E 3 master prompts using Gemini
+async function expandPromptWithAI(rawPrompt, style = "photorealistic") {
+  const cleanPrompt = rawPrompt.replace(/^["'`]|["'`]$/g, "").trim();
+  if (!cleanPrompt) return cleanPrompt;
+
+  if (geminiApiKey) {
+    const modelsToTry = [...new Set(GEMINI_MODELS)];
+    const styleGuide = style === "cinematic"
+      ? "cinematic modern Hollywood film still shot on Arri Alexa with anamorphic lens and volumetric lighting"
+      : style === "anime"
+      ? "modern vibrant high-budget anime film still in Makoto Shinkai and Ufotable aesthetic"
+      : style === "3d"
+      ? "modern Pixar and Unreal Engine 5.4 3D render with ray-traced subsurface scattering"
+      : style === "cyberpunk"
+      ? "modern futuristic cyberpunk photography with sharp neon reflections and atmospheric haze"
+      : style === "fantasy"
+      ? "modern epic fantasy digital masterpiece with luminous divine aura and intricate detailing"
+      : "modern ultra-realistic 8k photograph shot on Hasselblad H6D-100c with 85mm f/1.4 lens, hyper-realistic skin textures, sharp focus, volumetric lighting, and vivid vibrant colors";
+
+    const systemPrompt = [
+      "You are the expert prompt engineering engine for DALL-E 3 in ChatGPT.",
+      "Your mission is to rewrite user image requests into ultra-detailed, modern, breathtaking visual prompts that look state-of-the-art.",
+      "CRITICAL AESTHETIC DIRECTIVES:",
+      "1. The image MUST look MODERN, CRISP, HIGH-RESOLUTION 8k, and VIBRANT like modern ChatGPT DALL-E 3.",
+      "2. Absolutely NEVER produce vintage, faded, sepia, antique lithograph, retro, or 19th-century calendar art looks unless explicitly asked.",
+      "3. If depicting deities, mythological entities, or sacred figures (e.g. Maa Kali, Durga, Shiva, Krishna, Zeus, Buddha), depict them in divine radiant glory, luminous glowing golden aura, photorealistic anatomy, expressive eyes, hyper-detailed polished gold jewelry and garments, and cinematic volumetric lighting.",
+      "4. Regardless of input language (Hindi, Hinglish, Spanish, English, etc.), translate and produce the rewritten prompt in fluent, descriptive English.",
+      "5. Target length: 45 to 70 words.",
+      `6. Style guidance: ${styleGuide}.`,
+      "7. Output ONLY the rewritten English prompt. Do not add quotes, markdown formatting, or preamble."
+    ].join(" ");
+
+    for (const model of modelsToTry) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: `User requested: "${cleanPrompt}"` }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] }
+          })
+        });
+
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const expanded = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (expanded && expanded.length > 15) {
+            console.log(`[AI Prompt Expansion] Succeeded with model ${model}:`, expanded.slice(0, 80) + "...");
+            return expanded.replace(/^["'`]|["'`]$/g, "").replace(/\n+/g, " ").trim();
+          }
+        }
+      } catch (err) {
+        // Fallback to next model
+      }
+    }
+  }
+
+  // Fallback high-end enhancer if AI prompt expander is offline
   const styleModifier = IMAGE_STYLES[style] || IMAGE_STYLES.photorealistic;
-  const enhancedPrompt = `${cleanPrompt}, ${styleModifier}`;
+  return `${cleanPrompt}, ${styleModifier}, modern aesthetic, ultra-detailed 8k UHD, crisp sharpness, vivid vibrant colors, studio volumetric lighting, photorealistic masterpiece, no vintage, no sepia, no faded retro`;
+}
+
+function buildImageUrl(enhancedPrompt, style = "photorealistic", aspectRatio = "1:1") {
+  const cleanPrompt = enhancedPrompt.replace(/^["'`]|["'`]$/g, "").trim();
   const { width, height } = getDimensions(aspectRatio);
   const seed = Math.floor(Math.random() * 100000000);
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=${width}&height=${height}&nologo=true&seed=${seed}&model=flux`;
-  return { imageUrl, enhancedPrompt, width, height, seed };
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=${width}&height=${height}&nologo=true&seed=${seed}&model=flux-realism&enhance=true`;
+  return { imageUrl, enhancedPrompt: cleanPrompt, width, height, seed };
 }
 
 function extractImageRequest(text) {
@@ -163,19 +230,25 @@ function extractImageRequest(text) {
   const slashMatch = clean.match(/^(?:\/image|\/img|image:|img:)\s*(.+)/i);
   if (slashMatch) return slashMatch[1].trim();
 
-  // 2. Action verbs with articles: "generate the image of...", "create an image of..."
-  const actionMatch = clean.match(/^(?:(?:please\s+)?(?:can\s+you\s+|could\s+you\s+|will\s+you\s+)?(?:generate|create|make|draw|paint|show(?:\s+me)?|render|produce|design|craft|give\s+me)\s+(?:an?|the|some)?\s*(?:ai\s+)?(?:image|photo|picture|artwork|painting|portrait|drawing|visual|illustration|wallpaper)s?\s*(?:of|for|showing|depicting|about)?\s*[:\s]?\s*(.+))/i);
+  // 2. Action verbs with articles: "generate the image of...", "create an image of...", "make realistic image of..."
+  const actionMatch = clean.match(/^(?:(?:please\s+)?(?:can\s+you\s+|could\s+you\s+|will\s+you\s+)?(?:generate|create|make|draw|paint|show(?:\s+me)?|render|produce|design|craft|give\s+me)\s+(?:an?|the|some)?\s*(?:realistic\s+|modern\s+|ai\s+)*(?:image|photo|picture|artwork|painting|portrait|drawing|visual|illustration|wallpaper)s?\s*(?:of|for|showing|depicting|about)?\s*[:\s]?\s*(.+))/i);
   if (actionMatch && actionMatch[1]) return actionMatch[1].trim();
 
   // 3. Direct noun phrases: "image of maa kali", "photo of sunset"
-  const nounMatch = clean.match(/^(?:an?|the)?\s*(?:ai\s+)?(?:image|photo|picture|artwork|painting|portrait|drawing|illustration)\s+(?:of|showing|depicting|for)\s+(.+)/i);
+  const nounMatch = clean.match(/^(?:an?|the)?\s*(?:realistic\s+|modern\s+|ai\s+)*(?:image|photo|picture|artwork|painting|portrait|drawing|illustration)\s+(?:of|showing|depicting|for)\s+(.+)/i);
   if (nounMatch && nounMatch[1]) return nounMatch[1].trim();
 
   // 4. "I want an image of..."
-  const wantMatch = clean.match(/^(?:i\s+(?:want|need|would\s+like)\s+)(?:an?|the)?\s*(?:ai\s+)?(?:image|photo|picture|artwork|portrait)\s+(?:of|showing|for)?\s*(.+)/i);
+  const wantMatch = clean.match(/^(?:i\s+(?:want|need|would\s+like)\s+)(?:an?|the)?\s*(?:realistic\s+|modern\s+|ai\s+)*(?:image|photo|picture|artwork|portrait)\s+(?:of|showing|for)?\s*(.+)/i);
   if (wantMatch && wantMatch[1]) return wantMatch[1].trim();
 
-  // 5. Short draw/paint commands
+  // 5. Hindi / Hinglish patterns: "maa kali ki photo banao", "kali maa ki image banao", "photo bana do"
+  const hinglishMatch = clean.match(/^(.+?)\s*(?:ki|ka)?\s*(?:image|photo|pic|picture|tasveer|painting|drawing)\s*(?:banao|banado|bana\s*do|bana\s*ke\s*do|dikhao|dikhaye|chahiye|generate\s*karo|create\s*karo)/i);
+  if (hinglishMatch && hinglishMatch[1] && !/^(kya|kaise|kyun|who|what)/i.test(hinglishMatch[1])) {
+    return hinglishMatch[1].trim();
+  }
+
+  // 6. Short draw/paint commands
   const shortDrawMatch = clean.match(/^(?:draw|paint)\s+(?:me\s+)?(?:an?|the)?\s*(.+)/i);
   if (shortDrawMatch && shortDrawMatch[1] && !/^(a\s+conclusion|a\s+line)/i.test(shortDrawMatch[1])) {
     return shortDrawMatch[1].trim();
@@ -204,11 +277,17 @@ function extractVideoRequest(text) {
   const wantMatch = clean.match(/^(?:i\s+(?:want|need|would\s+like)\s+)(?:an?|the)?\s*(?:ai\s+)?(?:video|clip|animation)\s+(?:of|showing|for)?\s*(.+)/i);
   if (wantMatch && wantMatch[1]) return wantMatch[1].trim();
 
+  // 5. Hindi / Hinglish patterns: "video banao", "video create karo"
+  const hinglishMatch = clean.match(/^(.+?)\s*(?:ki|ka)?\s*(?:video|clip|animation)\s*(?:banao|banado|bana\s*do|dikhao|dikhaye|chahiye|generate\s*karo|create\s*karo)/i);
+  if (hinglishMatch && hinglishMatch[1] && !/^(kya|kaise|kyun|who|what)/i.test(hinglishMatch[1])) {
+    return hinglishMatch[1].trim();
+  }
+
   return null;
 }
 
 function isImageComplaintOrFollowUp(text) {
-  return /(?:i\s+(?:had\s+|have\s+)?(?:told|asked)\s+(?:you\s+)?to\s+(?:create|make|generate)\s+image|you\s+didn'?t\s+(?:create|generate|make|give)\s+(?:the\s+)?image|make\s+(?:the|an?)\s+image|generate\s+it|create\s+it\s+now|generate\s+image\s+please|why\s+didn'?t\s+you\s+generate)/i.test(text);
+  return /(?:i\s+(?:had\s+|have\s+)?(?:told|asked)\s+(?:you\s+)?to\s+(?:create|make|generate)\s+image|you\s+didn'?t\s+(?:create|generate|make|give)\s+(?:the\s+)?image|make\s+(?:the|an?)\s+image|generate\s+it|create\s+it\s+now|generate\s+image\s+please|why\s+didn'?t\s+you\s+generate|image\s+seems\s+(?:like\s+)?old|make\s+them\s+good|like\s+how\s+chatgpt\s+making|like\s+chatgpt|make\s+it\s+realistic|photo\s+acchi\s+nahi\s+hai|purani\s+lag\s+rahi|old\s+lag\s+rahi|realistic\s+banao)/i.test(text);
 }
 
 async function fetchVideoFromArchive(query) {
@@ -232,13 +311,14 @@ async function fetchVideoFromArchive(query) {
   return null;
 }
 
-app.post("/api/generate-image", (req, res) => {
+app.post("/api/generate-image", async (req, res) => {
   try {
     const { prompt, style = "cinematic", aspectRatio = "1:1" } = req.body;
     if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
       return res.status(400).json({ error: "Please provide a prompt for image generation." });
     }
-    const { imageUrl, enhancedPrompt, width, height, seed } = buildImageUrl(prompt, style, aspectRatio);
+    const enhancedPrompt = await expandPromptWithAI(prompt, style);
+    const { imageUrl, width, height, seed } = buildImageUrl(enhancedPrompt, style, aspectRatio);
     res.json({
       success: true,
       imageUrl,
@@ -263,7 +343,8 @@ app.post("/api/generate-video", async (req, res) => {
       return res.status(400).json({ error: "Please provide a prompt for video generation." });
     }
 
-    const { imageUrl, enhancedPrompt, width, height } = buildImageUrl(prompt, "cinematic", aspectRatio);
+    const enhancedPrompt = await expandPromptWithAI(prompt, "cinematic");
+    const { imageUrl, width, height } = buildImageUrl(enhancedPrompt, "cinematic", aspectRatio);
     const archiveVideoUrl = await fetchVideoFromArchive(prompt);
 
     res.json({
@@ -345,9 +426,10 @@ app.post("/api/chat", async (req, res) => {
     }
 
     if (targetImagePrompt) {
-      const { imageUrl, enhancedPrompt } = buildImageUrl(targetImagePrompt, "photorealistic", "1:1");
+      const enhancedPrompt = await expandPromptWithAI(targetImagePrompt, "photorealistic");
+      const { imageUrl } = buildImageUrl(enhancedPrompt, "photorealistic", "1:1");
       return res.json({
-        reply: `🎨 **Generated Realistic AI Image** for: *"${targetImagePrompt}"*`,
+        reply: `🎨 **Generated Realistic AI Image (DALL·E 3 Quality)** for: *"${targetImagePrompt}"*\n\n> *${enhancedPrompt}*`,
         media: {
           type: "image",
           url: imageUrl,
@@ -361,10 +443,11 @@ app.post("/api/chat", async (req, res) => {
     const targetVideoPrompt = extractVideoRequest(latestUserMessage);
 
     if (targetVideoPrompt) {
-      const { imageUrl, enhancedPrompt } = buildImageUrl(targetVideoPrompt, "cinematic", "16:9");
+      const enhancedPrompt = await expandPromptWithAI(targetVideoPrompt, "cinematic");
+      const { imageUrl } = buildImageUrl(enhancedPrompt, "cinematic", "16:9");
       const archiveVideoUrl = await fetchVideoFromArchive(targetVideoPrompt);
       return res.json({
-        reply: `🎬 **Generated AI Video** for: *"${targetVideoPrompt}"*`,
+        reply: `🎬 **Generated AI Video (Kinetic Motion)** for: *"${targetVideoPrompt}"*\n\n> *${enhancedPrompt}*`,
         media: {
           type: "video",
           url: archiveVideoUrl || null,
@@ -399,9 +482,10 @@ app.post("/api/chat", async (req, res) => {
           }
 
           if (extracted && extracted.length > 2) {
-            const { imageUrl, enhancedPrompt } = buildImageUrl(extracted, "photorealistic", "1:1");
+            const enhancedPrompt = await expandPromptWithAI(extracted, "photorealistic");
+            const { imageUrl } = buildImageUrl(enhancedPrompt, "photorealistic", "1:1");
             return res.json({
-              reply: `🎨 **Generated Realistic AI Image** for: *"${extracted.slice(0, 100)}"*`,
+              reply: `🎨 **Generated Realistic AI Image (DALL·E 3 Quality)** for: *"${extracted.slice(0, 100)}"*`,
               media: {
                 type: "image",
                 url: imageUrl,
