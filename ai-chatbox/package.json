@@ -8,6 +8,7 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
+    "@heyputer/puter.js": "^2.6.4",
     "dotenv": "^16.4.7",
     "express": "^4.21.2"
   }

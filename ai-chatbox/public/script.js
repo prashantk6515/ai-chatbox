@@ -551,25 +551,49 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
         const copyImgPromptBtn = mediaCard.querySelector(".copy-image-prompt-btn");
         const downloadBtn = mediaCard.querySelector(".download-media-btn");
 
+        let hasTriedFallback = false;
+        let retryCount = 0;
+
         imgEl.onload = () => {
           imgEl.style.opacity = "1";
           if (placeholder) placeholder.style.display = "none";
         };
 
         imgEl.onerror = () => {
+          // If fallbackUrl is available and hasn't been tried, immediately swap to it
+          if (!hasTriedFallback && media.fallbackUrl && imgEl.src !== media.fallbackUrl) {
+            hasTriedFallback = true;
+            if (placeholder) {
+              placeholder.innerHTML = `<div class="media-spinner"></div><span>Loading High-Resolution Visual Artwork...</span>`;
+            }
+            imgEl.src = media.fallbackUrl;
+            return;
+          }
+
+          // If retry count is under 2, try reloading the primary URL once more after a brief delay
+          if (retryCount < 2) {
+            retryCount++;
+            setTimeout(() => {
+              imgEl.src = media.fallbackUrl || media.url;
+            }, 2000);
+            return;
+          }
+
           if (placeholder) {
             placeholder.innerHTML = `
-              <span style="color:var(--accent-rose);font-size:12px;">Generation taking longer than expected</span>
-              <button class="chat-media-btn retry-btn" type="button" style="margin-top:6px;">Retry Loading</button>
+              <span style="color:var(--accent-rose);font-size:12px;">Image synthesis taking a moment</span>
+              <button class="chat-media-btn retry-btn" type="button" style="margin-top:6px;">Reload Image</button>
             `;
             placeholder.querySelector(".retry-btn")?.addEventListener("click", () => {
+              retryCount = 0;
+              hasTriedFallback = false;
               placeholder.innerHTML = `<div class="media-spinner"></div><span>Synthesizing Ultra-Realistic Artwork...</span>`;
-              imgEl.src = media.url + "&retry=" + Date.now();
+              imgEl.src = media.url;
             });
           }
         };
 
-        const openZoom = () => openLightbox(media.url, media.prompt || "Realistic AI Artwork");
+        const openZoom = () => openLightbox(imgEl.src || media.url, media.prompt || "Realistic AI Artwork");
         imgEl.addEventListener("click", openZoom);
         zoomBtn.addEventListener("click", openZoom);
 
@@ -580,7 +604,7 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
           });
         });
 
-        downloadBtn.addEventListener("click", () => downloadMedia(media.url, `ai-image-${Date.now()}.jpg`));
+        downloadBtn.addEventListener("click", () => downloadMedia(imgEl.src || media.url, `ai-image-${Date.now()}.jpg`));
       } else if (media.type === "video") {
         mediaCard.innerHTML = `
           <div class="chat-media-header">
@@ -1097,8 +1121,13 @@ generateImageBtn?.addEventListener("click", async () => {
 
     lastGeneratedImage = data;
     imageResultPreview.src = data.imageUrl;
+    imageResultPreview.onerror = () => {
+      if (data.fallbackUrl && imageResultPreview.src !== data.fallbackUrl) {
+        imageResultPreview.src = data.fallbackUrl;
+      }
+    };
     imageResultBox.style.display = "block";
-    imageResultPreview.onclick = () => openLightbox(data.imageUrl, prompt);
+    imageResultPreview.onclick = () => openLightbox(imageResultPreview.src || data.imageUrl, prompt);
 
     const promptDetails = document.querySelector("#image-prompt-details");
     if (promptDetails && data.enhancedPrompt) {
