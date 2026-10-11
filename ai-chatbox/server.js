@@ -80,6 +80,7 @@ async function callGemini(apiKey, safeMessages, timeInfo, liveWeatherInfo) {
 
   const systemInstructionText = [
     "You are a helpful, friendly general AI assistant. Explain clearly and accurately.",
+    "IMPORTANT: You do NOT have internal function calling or tools like 'dalle.text2im'. NEVER output raw JSON objects such as {\"action\": \"dalle.text2im\"}. When the user asks to generate images or videos, respond naturally in conversation as the app's visual studio automatically handles generation.",
     timeInfo
       ? `Real-time clock is active. Today's live date and time is: ${timeInfo}. When the user asks for today's date, current day, or time, DO NOT say you do not have real-time access. Directly provide this current date and time.`
       : "",
@@ -126,16 +127,16 @@ async function callGemini(apiKey, safeMessages, timeInfo, liveWeatherInfo) {
 }
 
 // ==========================================================================
-// AI Image & Video Generation Engine
+// AI Image & Video Generation Engine (Ultra-Realistic)
 // ==========================================================================
 
 const IMAGE_STYLES = {
-  photorealistic: "hyperrealistic 8k photo, natural lighting, sharp focus, masterpiece, highly detailed",
-  anime: "anime aesthetic, vibrant studio ghibli and makoto shinkai style, crisp lineart, digital illustration",
-  "3d": "3D digital render, Pixar and Unreal Engine 5 aesthetic, ray-traced shadows, smooth subsurface scattering",
-  cyberpunk: "cyberpunk sci-fi aesthetic, glowing neon colors, volumetric fog, futuristic night city, ultra-detailed",
-  cinematic: "cinematic film still, 35mm film photography, dramatic depth of field, anamorphic lens, IMAX quality",
-  fantasy: "epic fantasy digital painting, magical atmosphere, intricate detailing, ethereal lighting, concept art"
+  photorealistic: "ultra-realistic 8k photograph, highly detailed masterpiece, authentic fine textures, hyperrealistic natural cinematic lighting, professional 85mm lens portrait photography, photorealistic skin and fabric textures, volumetric lighting, sharp focus, award-winning photography, true-to-life colors",
+  cinematic: "cinematic film still, 35mm film photography, dramatic depth of field, anamorphic lens, IMAX quality, hyperrealistic lighting, 8k resolution, photorealistic",
+  anime: "anime aesthetic, vibrant studio ghibli and makoto shinkai style, crisp lineart, digital illustration, masterpiece",
+  "3d": "3D digital render, Pixar and Unreal Engine 5 aesthetic, ray-traced shadows, smooth subsurface scattering, 8k",
+  cyberpunk: "cyberpunk sci-fi aesthetic, glowing neon colors, volumetric fog, futuristic night city, ultra-detailed, 8k, photorealistic",
+  fantasy: "epic fantasy digital painting, magical atmosphere, intricate detailing, ethereal lighting, concept art, masterpiece"
 };
 
 function getDimensions(aspectRatio) {
@@ -144,13 +145,70 @@ function getDimensions(aspectRatio) {
   return { width: 1024, height: 1024 };
 }
 
-function buildImageUrl(prompt, style = "cinematic", aspectRatio = "1:1") {
-  const styleModifier = IMAGE_STYLES[style] || IMAGE_STYLES.cinematic;
-  const enhancedPrompt = `${prompt.trim()}, ${styleModifier}`;
+function buildImageUrl(prompt, style = "photorealistic", aspectRatio = "1:1") {
+  const cleanPrompt = prompt.replace(/^["'`]|["'`]$/g, "").trim();
+  const styleModifier = IMAGE_STYLES[style] || IMAGE_STYLES.photorealistic;
+  const enhancedPrompt = `${cleanPrompt}, ${styleModifier}`;
   const { width, height } = getDimensions(aspectRatio);
-  const seed = Math.floor(Math.random() * 10000000);
+  const seed = Math.floor(Math.random() * 100000000);
   const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=${width}&height=${height}&nologo=true&seed=${seed}&model=flux`;
   return { imageUrl, enhancedPrompt, width, height, seed };
+}
+
+function extractImageRequest(text) {
+  if (!text || typeof text !== "string") return null;
+  const clean = text.trim();
+
+  // 1. Explicit commands
+  const slashMatch = clean.match(/^(?:\/image|\/img|image:|img:)\s*(.+)/i);
+  if (slashMatch) return slashMatch[1].trim();
+
+  // 2. Action verbs with articles: "generate the image of...", "create an image of..."
+  const actionMatch = clean.match(/^(?:(?:please\s+)?(?:can\s+you\s+|could\s+you\s+|will\s+you\s+)?(?:generate|create|make|draw|paint|show(?:\s+me)?|render|produce|design|craft|give\s+me)\s+(?:an?|the|some)?\s*(?:ai\s+)?(?:image|photo|picture|artwork|painting|portrait|drawing|visual|illustration|wallpaper)s?\s*(?:of|for|showing|depicting|about)?\s*[:\s]?\s*(.+))/i);
+  if (actionMatch && actionMatch[1]) return actionMatch[1].trim();
+
+  // 3. Direct noun phrases: "image of maa kali", "photo of sunset"
+  const nounMatch = clean.match(/^(?:an?|the)?\s*(?:ai\s+)?(?:image|photo|picture|artwork|painting|portrait|drawing|illustration)\s+(?:of|showing|depicting|for)\s+(.+)/i);
+  if (nounMatch && nounMatch[1]) return nounMatch[1].trim();
+
+  // 4. "I want an image of..."
+  const wantMatch = clean.match(/^(?:i\s+(?:want|need|would\s+like)\s+)(?:an?|the)?\s*(?:ai\s+)?(?:image|photo|picture|artwork|portrait)\s+(?:of|showing|for)?\s*(.+)/i);
+  if (wantMatch && wantMatch[1]) return wantMatch[1].trim();
+
+  // 5. Short draw/paint commands
+  const shortDrawMatch = clean.match(/^(?:draw|paint)\s+(?:me\s+)?(?:an?|the)?\s*(.+)/i);
+  if (shortDrawMatch && shortDrawMatch[1] && !/^(a\s+conclusion|a\s+line)/i.test(shortDrawMatch[1])) {
+    return shortDrawMatch[1].trim();
+  }
+
+  return null;
+}
+
+function extractVideoRequest(text) {
+  if (!text || typeof text !== "string") return null;
+  const clean = text.trim();
+
+  // 1. Explicit slash / prefix commands
+  const slashMatch = clean.match(/^(?:\/video|\/vid|video:|vid:)\s*(.+)/i);
+  if (slashMatch) return slashMatch[1].trim();
+
+  // 2. Action verbs: "generate video...", "create video...", "make a video of..."
+  const actionMatch = clean.match(/^(?:(?:please\s+)?(?:can\s+you\s+|could\s+you\s+|will\s+you\s+)?(?:generate|create|make|show(?:\s+me)?|produce|render|craft|give\s+me)\s+(?:an?|the|some)?\s*(?:ai\s+)?(?:video|clip|animation|footage|movie|film|motion)s?\s*(?:of|for|showing|depicting|about)?\s*[:\s]?\s*(.+))/i);
+  if (actionMatch && actionMatch[1]) return actionMatch[1].trim();
+
+  // 3. Direct noun phrases: "video of maa durga", "clip of ocean"
+  const nounMatch = clean.match(/^(?:an?|the)?\s*(?:ai\s+)?(?:video|clip|animation|motion|footage)\s+(?:of|showing|depicting|for)\s+(.+)/i);
+  if (nounMatch && nounMatch[1]) return nounMatch[1].trim();
+
+  // 4. "I want a video of..."
+  const wantMatch = clean.match(/^(?:i\s+(?:want|need|would\s+like)\s+)(?:an?|the)?\s*(?:ai\s+)?(?:video|clip|animation)\s+(?:of|showing|for)?\s*(.+)/i);
+  if (wantMatch && wantMatch[1]) return wantMatch[1].trim();
+
+  return null;
+}
+
+function isImageComplaintOrFollowUp(text) {
+  return /(?:i\s+(?:had\s+|have\s+)?(?:told|asked)\s+(?:you\s+)?to\s+(?:create|make|generate)\s+image|you\s+didn'?t\s+(?:create|generate|make|give)\s+(?:the\s+)?image|make\s+(?:the|an?)\s+image|generate\s+it|create\s+it\s+now|generate\s+image\s+please|why\s+didn'?t\s+you\s+generate)/i.test(text);
 }
 
 async function fetchVideoFromArchive(query) {
@@ -269,39 +327,49 @@ app.post("/api/chat", async (req, res) => {
 
     const latestUserMessage = safeMessages[safeMessages.length - 1]?.content || "";
 
-    // Detect image generation commands
-    const imageMatch = latestUserMessage.match(/^(?:\/image|image:)\s*(.+)/i) ||
-      latestUserMessage.match(/^(?:generate|create|make|draw|show)\s+(?:an?\s+)?image\s+(?:of|for|about)?\s*(.+)/i);
+    // 1. Detect image generation intent
+    let targetImagePrompt = extractImageRequest(latestUserMessage);
 
-    if (imageMatch && imageMatch[1]) {
-      const prompt = imageMatch[1].trim();
-      const { imageUrl, enhancedPrompt } = buildImageUrl(prompt, "cinematic", "1:1");
+    // Check if user is following up after an issue ("i had told to create image but you didn't")
+    if (!targetImagePrompt && isImageComplaintOrFollowUp(latestUserMessage)) {
+      for (let i = safeMessages.length - 2; i >= 0; i--) {
+        const prevMsg = safeMessages[i];
+        if (prevMsg && prevMsg.role === "user") {
+          const found = extractImageRequest(prevMsg.content) || prevMsg.content.replace(/(?:generate|create|make|draw|show)\s+(?:an?|the)?\s*image\s*(?:of)?/gi, "").trim();
+          if (found && found.length > 2) {
+            targetImagePrompt = found;
+            break;
+          }
+        }
+      }
+    }
+
+    if (targetImagePrompt) {
+      const { imageUrl, enhancedPrompt } = buildImageUrl(targetImagePrompt, "photorealistic", "1:1");
       return res.json({
-        reply: `🎨 **Generated AI Image** for: *"${prompt}"*`,
+        reply: `🎨 **Generated Realistic AI Image** for: *"${targetImagePrompt}"*`,
         media: {
           type: "image",
           url: imageUrl,
-          prompt: prompt,
+          prompt: targetImagePrompt,
           enhancedPrompt: enhancedPrompt
         }
       });
     }
 
-    // Detect video generation commands
-    const videoMatch = latestUserMessage.match(/^(?:\/video|video:)\s*(.+)/i) ||
-      latestUserMessage.match(/^(?:generate|create|make|produce|show)\s+(?:an?\s+)?video\s+(?:of|for|about)?\s*(.+)/i);
+    // 2. Detect video generation commands
+    const targetVideoPrompt = extractVideoRequest(latestUserMessage);
 
-    if (videoMatch && videoMatch[1]) {
-      const prompt = videoMatch[1].trim();
-      const { imageUrl, enhancedPrompt } = buildImageUrl(prompt, "cinematic", "16:9");
-      const archiveVideoUrl = await fetchVideoFromArchive(prompt);
+    if (targetVideoPrompt) {
+      const { imageUrl, enhancedPrompt } = buildImageUrl(targetVideoPrompt, "cinematic", "16:9");
+      const archiveVideoUrl = await fetchVideoFromArchive(targetVideoPrompt);
       return res.json({
-        reply: `🎬 **Generated AI Video** for: *"${prompt}"*`,
+        reply: `🎬 **Generated AI Video** for: *"${targetVideoPrompt}"*`,
         media: {
           type: "video",
           url: archiveVideoUrl || null,
           posterUrl: imageUrl,
-          prompt: prompt,
+          prompt: targetVideoPrompt,
           enhancedPrompt: enhancedPrompt
         }
       });
@@ -309,6 +377,45 @@ app.post("/api/chat", async (req, res) => {
 
     const liveWeatherInfo = await getLiveWeather(latestUserMessage);
     const reply = await callGemini(geminiApiKey, safeMessages, timeInfo, liveWeatherInfo);
+
+    // 3. Safety Interceptor: If Gemini hallucinates a JSON tool call (e.g. dalle.text2im)
+    if (typeof reply === "string") {
+      const toolMatch = reply.match(/\{[\s\S]*"action"\s*:\s*"(?:dalle|image|generate)[\s\S]*\}/i);
+      if (toolMatch) {
+        try {
+          const parsed = JSON.parse(toolMatch[0]);
+          let extracted = "";
+          if (typeof parsed.action_input === "string") {
+            try {
+              const inner = JSON.parse(parsed.action_input);
+              extracted = inner.prompt || parsed.action_input;
+            } catch {
+              extracted = parsed.action_input;
+            }
+          } else if (parsed.action_input && parsed.action_input.prompt) {
+            extracted = parsed.action_input.prompt;
+          } else if (parsed.prompt) {
+            extracted = parsed.prompt;
+          }
+
+          if (extracted && extracted.length > 2) {
+            const { imageUrl, enhancedPrompt } = buildImageUrl(extracted, "photorealistic", "1:1");
+            return res.json({
+              reply: `🎨 **Generated Realistic AI Image** for: *"${extracted.slice(0, 100)}"*`,
+              media: {
+                type: "image",
+                url: imageUrl,
+                prompt: extracted,
+                enhancedPrompt: enhancedPrompt
+              }
+            });
+          }
+        } catch (err) {
+          console.warn("JSON tool call parse fallback ignored:", err.message);
+        }
+      }
+    }
+
     res.json({ reply });
   } catch (error) {
     console.error("AI request failed:", error.message);

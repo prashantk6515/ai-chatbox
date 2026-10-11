@@ -518,12 +518,16 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
           <div class="chat-media-header">
             <span class="chat-media-badge">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-              <span>AI Image</span>
+              <span>Realistic AI Image</span>
             </span>
             <span class="chat-media-prompt" title="${escapeHtml(media.prompt || '')}">${escapeHtml(media.prompt || '')}</span>
           </div>
           <div class="chat-media-preview-container">
-            <img src="${media.url}" alt="${escapeHtml(media.prompt || 'Generated AI image')}" loading="lazy" />
+            <div class="media-loading-placeholder">
+              <div class="media-spinner"></div>
+              <span>Generating Realistic AI Artwork...</span>
+            </div>
+            <img src="${media.url}" alt="${escapeHtml(media.prompt || 'Generated AI image')}" loading="eager" style="opacity: 0; transition: opacity 0.4s ease;" />
           </div>
           <div class="chat-media-actions">
             <button class="chat-media-btn open-lightbox-btn" type="button" title="View Fullscreen">
@@ -538,10 +542,29 @@ function renderMessageDOM(role, text, isTyping = false, media = null) {
         `;
 
         const imgEl = mediaCard.querySelector("img");
+        const placeholder = mediaCard.querySelector(".media-loading-placeholder");
         const zoomBtn = mediaCard.querySelector(".open-lightbox-btn");
         const downloadBtn = mediaCard.querySelector(".download-media-btn");
 
-        const openZoom = () => openLightbox(media.url, media.prompt || "AI Artwork");
+        imgEl.onload = () => {
+          imgEl.style.opacity = "1";
+          if (placeholder) placeholder.style.display = "none";
+        };
+
+        imgEl.onerror = () => {
+          if (placeholder) {
+            placeholder.innerHTML = `
+              <span style="color:var(--accent-rose);font-size:12px;">Generation taking longer than expected</span>
+              <button class="chat-media-btn retry-btn" type="button" style="margin-top:6px;">Retry Loading</button>
+            `;
+            placeholder.querySelector(".retry-btn")?.addEventListener("click", () => {
+              placeholder.innerHTML = `<div class="media-spinner"></div><span>Synthesizing Realistic AI Artwork...</span>`;
+              imgEl.src = media.url + "&retry=" + Date.now();
+            });
+          }
+        };
+
+        const openZoom = () => openLightbox(media.url, media.prompt || "Realistic AI Artwork");
         imgEl.addEventListener("click", openZoom);
         zoomBtn.addEventListener("click", openZoom);
         downloadBtn.addEventListener("click", () => downloadMedia(media.url, `ai-image-${Date.now()}.jpg`));
