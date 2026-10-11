@@ -21,6 +21,7 @@ const charCounter = document.querySelector("#char-counter");
 const micBtn = document.querySelector("#mic-btn");
 const scrollBottomBtn = document.querySelector("#scroll-bottom-btn");
 const chatHistoryList = document.querySelector("#chat-history-list");
+const pinCurrentBtn = document.querySelector("#pin-current-btn");
 
 // State Management
 let currentChatId = Date.now().toString();
@@ -95,8 +96,26 @@ if (window.innerWidth < 820) {
 }
 
 // ==========================================================================
-// Chat Sessions & History
+// Chat Sessions & History (with Pinning Support)
 // ==========================================================================
+
+function sortAndSaveSessions() {
+  chatSessions.sort((a, b) => {
+    const aPin = !!a.isPinned;
+    const bPin = !!b.isPinned;
+    if (aPin !== bPin) {
+      return aPin ? -1 : 1;
+    }
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+
+  // Preserve all pinned sessions, keep top 30 unpinned sessions
+  const pinned = chatSessions.filter(s => s.isPinned);
+  const unpinned = chatSessions.filter(s => !s.isPinned).slice(0, 30);
+  chatSessions = [...pinned, ...unpinned];
+
+  localStorage.setItem("gemini_chat_sessions", JSON.stringify(chatSessions));
+}
 
 function saveCurrentSession() {
   if (conversation.length === 0) return;
@@ -104,11 +123,14 @@ function saveCurrentSession() {
   const title = firstUserMsg.slice(0, 32);
 
   const existingIndex = chatSessions.findIndex(s => s.id === currentChatId);
+  const existingSession = existingIndex >= 0 ? chatSessions[existingIndex] : null;
+
   const sessionData = {
     id: currentChatId,
     title,
     messages: conversation,
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    isPinned: existingSession ? !!existingSession.isPinned : false
   };
 
   if (existingIndex >= 0) {
@@ -117,31 +139,81 @@ function saveCurrentSession() {
     chatSessions.unshift(sessionData);
   }
 
-  // Keep top 20 sessions
-  chatSessions = chatSessions.slice(0, 20);
-  localStorage.setItem("gemini_chat_sessions", JSON.stringify(chatSessions));
+  sortAndSaveSessions();
   renderChatHistory();
+  updateTopBarPinState();
+}
+
+function togglePinSession(sessionId) {
+  const session = chatSessions.find(s => s.id === sessionId);
+  if (!session) return;
+  session.isPinned = !session.isPinned;
+  session.updatedAt = Date.now();
+  sortAndSaveSessions();
+  renderChatHistory();
+  updateTopBarPinState();
+}
+
+function updateTopBarPinState() {
+  if (!pinCurrentBtn) return;
+  const currentSession = chatSessions.find(s => s.id === currentChatId);
+  const isPinned = !!currentSession?.isPinned;
+  if (isPinned) {
+    pinCurrentBtn.classList.add("active");
+    pinCurrentBtn.title = "Unpin Current Chat";
+    pinCurrentBtn.setAttribute("aria-label", "Unpin Current Chat");
+  } else {
+    pinCurrentBtn.classList.remove("active");
+    pinCurrentBtn.title = "Pin Current Chat";
+    pinCurrentBtn.setAttribute("aria-label", "Pin Current Chat");
+  }
 }
 
 function renderChatHistory() {
+  if (!chatHistoryList) return;
   chatHistoryList.innerHTML = "";
   if (chatSessions.length === 0) {
     chatHistoryList.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:10px 8px;">No previous chats</div>`;
+    updateTopBarPinState();
     return;
   }
 
-  chatSessions.forEach(session => {
+  const pinnedSessions = chatSessions.filter(s => s.isPinned);
+  const regularSessions = chatSessions.filter(s => !s.isPinned);
+
+  const createHistoryItem = (session) => {
     const item = document.createElement("div");
-    item.className = `history-item ${session.id === currentChatId ? 'active' : ''}`;
+    item.className = `history-item ${session.id === currentChatId ? 'active' : ''} ${session.isPinned ? 'pinned' : ''}`;
+    item.setAttribute("data-session-id", session.id);
+
     item.innerHTML = `
-      <span class="history-title" title="${escapeHtml(session.title)}">${escapeHtml(session.title)}</span>
-      <button class="history-delete-btn" aria-label="Delete chat">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
+      <div class="history-item-left">
+        ${session.isPinned ? `
+          <span class="pinned-badge-icon" title="Pinned chat">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+          </span>
+        ` : ''}
+        <span class="history-title" title="${escapeHtml(session.title)}">${escapeHtml(session.title)}</span>
+      </div>
+      <div class="history-actions">
+        <button class="history-pin-btn ${session.isPinned ? 'is-pinned' : ''}" type="button" title="${session.isPinned ? 'Unpin chat' : 'Pin chat'}" aria-label="${session.isPinned ? 'Unpin chat' : 'Pin chat'}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+        </button>
+        <button class="history-delete-btn" type="button" title="Delete chat" aria-label="Delete chat">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
     `;
 
     item.addEventListener("click", (e) => {
-      if (e.target.closest(".history-delete-btn")) {
+      const pinBtn = e.target.closest(".history-pin-btn");
+      if (pinBtn) {
+        e.stopPropagation();
+        togglePinSession(session.id);
+        return;
+      }
+      const deleteBtn = e.target.closest(".history-delete-btn");
+      if (deleteBtn) {
         e.stopPropagation();
         deleteSession(session.id);
         return;
@@ -149,8 +221,32 @@ function renderChatHistory() {
       loadSession(session.id);
     });
 
-    chatHistoryList.appendChild(item);
+    return item;
+  };
+
+  if (pinnedSessions.length > 0) {
+    const pinnedHeader = document.createElement("div");
+    pinnedHeader.className = "history-subgroup-title";
+    pinnedHeader.innerHTML = `<span>📌 Pinned</span><span class="history-count-badge">${pinnedSessions.length}</span>`;
+    chatHistoryList.appendChild(pinnedHeader);
+
+    pinnedSessions.forEach(session => {
+      chatHistoryList.appendChild(createHistoryItem(session));
+    });
+
+    if (regularSessions.length > 0) {
+      const recentHeader = document.createElement("div");
+      recentHeader.className = "history-subgroup-title recent-title";
+      recentHeader.innerHTML = `<span>Recent</span><span class="history-count-badge">${regularSessions.length}</span>`;
+      chatHistoryList.appendChild(recentHeader);
+    }
+  }
+
+  regularSessions.forEach(session => {
+    chatHistoryList.appendChild(createHistoryItem(session));
   });
+
+  updateTopBarPinState();
 }
 
 function loadSession(sessionId) {
@@ -167,6 +263,7 @@ function loadSession(sessionId) {
   });
 
   renderChatHistory();
+  updateTopBarPinState();
   if (window.innerWidth < 820) sidebar.classList.add("collapsed");
 }
 
@@ -177,6 +274,7 @@ function deleteSession(sessionId) {
     resetChat();
   } else {
     renderChatHistory();
+    updateTopBarPinState();
   }
 }
 
@@ -545,11 +643,26 @@ function resetChat() {
   messageInput.style.height = "auto";
   updateCharCounter();
   renderChatHistory();
+  updateTopBarPinState();
   messageInput.focus();
 }
 
 newChatBtn.addEventListener("click", resetChat);
 clearChatBtn.addEventListener("click", resetChat);
+
+if (pinCurrentBtn) {
+  pinCurrentBtn.addEventListener("click", () => {
+    let session = chatSessions.find(s => s.id === currentChatId);
+    if (!session) {
+      if (conversation.length === 0) return;
+      saveCurrentSession();
+      session = chatSessions.find(s => s.id === currentChatId);
+    }
+    if (session) {
+      togglePinSession(session.id);
+    }
+  });
+}
 
 // Initialize App
 initTheme();

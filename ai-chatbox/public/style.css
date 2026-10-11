@@ -29,6 +29,7 @@
   --accent-purple: #c084fc;
   --accent-emerald: #10b981;
   --accent-rose: #f43f5e;
+  --accent-amber: #f59e0b;
   
   --gradient-brand: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
   --gradient-btn: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
@@ -255,17 +256,49 @@ button {
   padding-right: 4px;
 }
 
+/* History Subgroup Titles */
+.history-subgroup-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 4px 6px 2px;
+  margin-top: 6px;
+  user-select: none;
+}
+
+.history-subgroup-title.recent-title {
+  margin-top: 10px;
+}
+
+.history-count-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+[data-theme="light"] .history-count-badge {
+  background: rgba(0, 0, 0, 0.05);
+}
+
 .history-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 12px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
   transition: var(--transition);
   user-select: none;
+  gap: 6px;
 }
 
 .history-item:hover, .history-item.active {
@@ -278,26 +311,83 @@ button {
   font-weight: 600;
 }
 
+.history-item.pinned {
+  background: rgba(245, 158, 11, 0.06);
+  border-left: 2.5px solid var(--accent-amber);
+}
+
+.history-item.pinned.active {
+  background: rgba(245, 158, 11, 0.12);
+  border-left: 2.5px solid var(--accent-amber);
+}
+
+.history-item-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.pinned-badge-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent-amber);
+  flex-shrink: 0;
+}
+
 .history-title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 190px;
+  flex: 1;
 }
 
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.history-pin-btn,
 .history-delete-btn {
   opacity: 0;
   padding: 4px;
+  border-radius: 4px;
   color: var(--text-muted);
-  transition: opacity 0.15s ease;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
+.history-pin-btn.is-pinned {
+  opacity: 0.85;
+  color: var(--accent-amber);
+}
+
+.history-item:hover .history-pin-btn,
 .history-item:hover .history-delete-btn {
   opacity: 1;
 }
 
+.history-pin-btn:hover {
+  color: var(--accent-amber);
+  transform: scale(1.15);
+}
+
 .history-delete-btn:hover {
   color: var(--accent-rose);
+  transform: scale(1.15);
+}
+
+/* Top bar Pin Current Chat Button */
+#pin-current-btn.active {
+  color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.4);
 }
 
 
