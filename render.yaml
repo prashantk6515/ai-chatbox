@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ai-chatbox
+    env: node
+    buildCommand: npm install --prefix ai-chatbox
+    startCommand: node ai-chatbox/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
