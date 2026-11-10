@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dns from "dns/promises";
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 import authRouter from "./routes/authRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
@@ -230,7 +231,54 @@ function createEmailTransporter() {
   return null;
 }
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const resendClient = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+
 async function sendOtpEmail(email, code) {
+  const htmlContent = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #0b0d14; color: #f8fafc; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1);">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="margin: 0; font-size: 24px; color: #38bdf8; font-weight: 800;">Agentic AI <span style="color: #c084fc;">Studio</span></h1>
+        <p style="margin: 6px 0 0; color: #94a3b8; font-size: 13px;">Security &amp; Account Verification</p>
+      </div>
+      <div style="background: rgba(255,255,255,0.04); border-radius: 12px; padding: 24px; border: 1px solid rgba(255,255,255,0.08); text-align: center;">
+        <p style="margin: 0 0 16px; color: #cbd5e1; font-size: 14px; line-height: 1.5;">Please use the following 6-digit verification code to activate your account:</p>
+        <div style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, rgba(56,189,248,0.15), rgba(129,140,248,0.15)); border: 2px dashed #818cf8; border-radius: 12px; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #ffffff; font-family: 'Courier New', monospace; margin-bottom: 16px;">
+          ${code}
+        </div>
+        <p style="margin: 0; color: #f59e0b; font-size: 12px;">⏳ This code is valid for 5 minutes only.</p>
+      </div>
+      <p style="margin: 20px 0 0; color: #64748b; font-size: 11px; text-align: center; line-height: 1.4;">If you did not request this verification code, please ignore this email.</p>
+    </div>
+  `;
+
+  // 1. Primary Email Delivery via Resend (Modern API, instant inbox arrival)
+  if (resendClient) {
+    try {
+      console.log(`[OTP] 📤 Sending live verification email to ${email} via Resend API...`);
+      const fromAddress = process.env.RESEND_FROM || "Agentic AI Studio <onboarding@resend.dev>";
+      const { data, error } = await resendClient.emails.send({
+        from: fromAddress,
+        to: email,
+        subject: `🔐 Your Agentic AI Verification Code: ${code}`,
+        text: `Your Agentic AI Studio verification code is: ${code}\n\nThis code will expire in 5 minutes. Do not share this code with anyone.`,
+        html: htmlContent
+      });
+
+      if (data && data.id) {
+        console.log(`[OTP] ✅ Live email sent via Resend successfully to ${email} (Message ID: ${data.id})`);
+        return { delivered: true, id: data.id, provider: "resend" };
+      }
+
+      if (error) {
+        console.warn(`[OTP] ⚠️ Resend note for ${email}: ${error.message || JSON.stringify(error)}`);
+      }
+    } catch (err) {
+      console.warn(`[OTP] ⚠️ Resend error: ${err.message}`);
+    }
+  }
+
+  // 2. Secondary Email Delivery via SMTP / Nodemailer
   const transporter = createEmailTransporter();
   const user = process.env.SMTP_USER || process.env.EMAIL_USER;
   const fromAddress = process.env.SMTP_FROM || (user ? `"Agentic AI Studio" <${user}>` : `"Agentic AI Studio" <noreply@agentic-ai-studio.local>`);
@@ -243,28 +291,12 @@ async function sendOtpEmail(email, code) {
         to: email,
         subject: `🔐 Your Agentic AI Verification Code: ${code}`,
         text: `Your Agentic AI Studio verification code is: ${code}\n\nThis code will expire in 5 minutes. Do not share this code with anyone.`,
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #0b0d14; color: #f8fafc; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1);">
-            <div style="text-align: center; margin-bottom: 24px;">
-              <h1 style="margin: 0; font-size: 24px; color: #38bdf8; font-weight: 800;">Agentic AI <span style="color: #c084fc;">Studio</span></h1>
-              <p style="margin: 6px 0 0; color: #94a3b8; font-size: 13px;">Security &amp; Account Verification</p>
-            </div>
-            <div style="background: rgba(255,255,255,0.04); border-radius: 12px; padding: 24px; border: 1px solid rgba(255,255,255,0.08); text-align: center;">
-              <p style="margin: 0 0 16px; color: #cbd5e1; font-size: 14px; line-height: 1.5;">Please use the following 6-digit verification code to activate your account:</p>
-              <div style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, rgba(56,189,248,0.15), rgba(129,140,248,0.15)); border: 2px dashed #818cf8; border-radius: 12px; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #ffffff; font-family: 'Courier New', monospace; margin-bottom: 16px;">
-                ${code}
-              </div>
-              <p style="margin: 0; color: #f59e0b; font-size: 12px;">⏳ This code is valid for 5 minutes only.</p>
-            </div>
-            <p style="margin: 20px 0 0; color: #64748b; font-size: 11px; text-align: center; line-height: 1.4;">If you did not request this verification code, please ignore this email.</p>
-          </div>
-        `
+        html: htmlContent
       });
       console.log(`[OTP] ✅ Live email sent successfully to ${email} (Message ID: ${info.messageId})`);
-      return { delivered: true, devMode: false };
+      return { delivered: true, devMode: false, provider: "smtp" };
     } catch (err) {
       console.error(`[OTP] ❌ SMTP send failed: ${err.message}`);
-      // Also log to terminal so developer can test if SMTP fails
       console.log("\n" + "=".repeat(62));
       console.log(`  🔐 [OTP VERIFICATION CODE - SMTP ERROR FALLBACK]`);
       console.log(`  ➜  Recipient:  ${email}`);
@@ -275,13 +307,13 @@ async function sendOtpEmail(email, code) {
     }
   }
 
-  // Development mode (no SMTP credentials configured in .env):
+  // 3. Fallback: Terminal / Console Display
   console.log("\n" + "=".repeat(62));
   console.log(`  🔐 [OTP VERIFICATION CODE (Terminal Only)]`);
   console.log(`  ➜  Recipient:  ${email}`);
   console.log(`  ➜  OTP Code:   ${code}`);
   console.log(`  ➜  Expires:    5 Minutes`);
-  console.log(`  💡 (Configure EMAIL_USER & EMAIL_PASS in .env to deliver real emails to inbox)`);
+  console.log(`  💡 (Resend or SMTP delivers real emails directly to inboxes)`);
   console.log("=".repeat(62) + "\n");
 
   return { delivered: false, devMode: true };
