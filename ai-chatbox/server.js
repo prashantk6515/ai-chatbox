@@ -33,10 +33,10 @@ app.use("/api/admin", adminRouter);
 // Authorized Email Whitelist & Access Control
 // ==========================================================================
 function getAuthorizedEmails() {
-  const envEmails = process.env.AUTHORIZED_EMAILS || "";
-  if (!envEmails.trim()) {
-    // Default fallback authorized emails if not explicitly set in .env
-    return ["admin@aistudio.com", "demo@aistudio.com"];
+  const envEmails = process.env.AUTHORIZED_EMAILS;
+  if (!envEmails || !envEmails.trim()) {
+    // Default: Allow all users to register when no whitelist is explicitly set
+    return ["*"];
   }
   return envEmails
     .split(",")
@@ -48,7 +48,7 @@ function isEmailAuthorized(email) {
   if (!email || typeof email !== "string") return false;
   const cleanEmail = email.trim().toLowerCase();
   const list = getAuthorizedEmails();
-  if (list.includes("*")) return true;
+  if (list.includes("*") || list.length === 0) return true;
   return list.some(allowed => {
     if (allowed === "*") return true;
     // Domain match: e.g. @company.com
@@ -402,6 +402,7 @@ app.post("/api/auth/send-otp", async (req, res) => {
       delivered: false,
       devMode: true,
       email: cleanEmail,
+      otpCode: code,
       message: sendResult.error
         ? `Live SMTP error (${sendResult.error}). Verification code logged in server terminal!`
         : `Verification code sent! (Check your server terminal console or inbox).`

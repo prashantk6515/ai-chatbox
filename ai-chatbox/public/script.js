@@ -1767,6 +1767,11 @@ authSignupForm?.addEventListener("submit", async (e) => {
 
     startOtpTimer(300);
 
+    // If running in development / no SMTP, log OTP to browser console for easy verification
+    if (data.otpCode) {
+      console.log(`%c🔐 [AGENTIC AI OTP CODE]: ${data.otpCode}`, "color: #38bdf8; font-weight: bold; font-size: 15px; background: #0f172a; padding: 4px 8px; border-radius: 4px;");
+    }
+
     const alertType = data.delivered ? "success" : "warning";
     showAuthAlert(data.message || `Verification code sent to ${email}.`, alertType);
   } catch (err) {
@@ -2230,6 +2235,9 @@ resendOtpBtn?.addEventListener("click", async () => {
     }
     startOtpTimer(300);
     if (otpCodeInput) otpCodeInput.value = "";
+    if (data.otpCode) {
+      console.log(`%c🔐 [AGENTIC AI RESENT OTP CODE]: ${data.otpCode}`, "color: #38bdf8; font-weight: bold; font-size: 15px; background: #0f172a; padding: 4px 8px; border-radius: 4px;");
+    }
     showAuthAlert(data.message || `New verification code sent to ${pendingRegistration.email}.`, data.delivered ? "success" : "warning");
   } catch (err) {
     showAuthAlert("Error resending code: " + err.message, "error");
