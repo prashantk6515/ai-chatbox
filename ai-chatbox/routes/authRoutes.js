@@ -201,9 +201,17 @@ router.post("/forgot-password", authRateLimiter, async (req, res) => {
     // Direct reset code (first 6 characters of token in uppercase for easy input)
     const resetCode = resetInfo.token.slice(0, 6).toUpperCase();
 
+    console.log("\n" + "=".repeat(62));
+    console.log(`  🔑 [PASSWORD RESET CODE / TOKEN]`);
+    console.log(`  ➜  Recipient:  ${cleanEmail}`);
+    console.log(`  ➜  Reset Code: ${resetCode}`);
+    console.log(`  ➜  Full Token: ${resetInfo.token}`);
+    console.log(`  ➜  Expires:    1 Hour`);
+    console.log("=".repeat(62) + "\n");
+
     res.json({
       success: true,
-      message: `Password reset instructions prepared for ${cleanEmail}.`,
+      message: `Password reset instructions prepared for ${cleanEmail}. (Code logged in terminal)`,
       resetToken: resetInfo.token,
       resetCode: resetCode
     });

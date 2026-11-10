@@ -343,6 +343,7 @@ app.post("/api/auth/send-otp", async (req, res) => {
     // 0. Duplicate account check
     const existingUser = UserService.findByEmail(cleanEmail);
     if (existingUser) {
+      console.log(`\n[OTP] ⚠️ Account '${cleanEmail}' already exists in database. Sign in directly or reset password.\n`);
       return res.status(409).json({
         error: `An account with '${cleanEmail}' already exists. Please sign in instead.`
       });

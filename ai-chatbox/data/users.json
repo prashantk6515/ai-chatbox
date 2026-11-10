@@ -18,15 +18,5 @@
     "isVerified": true,
     "createdAt": "2026-11-09T10:00:02.863Z",
     "updatedAt": "2026-11-09T10:00:02.863Z"
-  },
-  {
-    "id": "usr_prashant_01",
-    "name": "Prashant Kumar",
-    "email": "prashantk6515@gmail.com",
-    "passwordHash": "$2b$10$N80jI/meljNSVfJiTs/j3O21fpHCA2WLg7ld82TZlj1eLzbAecjxK",
-    "role": "admin",
-    "isVerified": true,
-    "createdAt": "2026-11-09T10:17:32.670Z",
-    "updatedAt": "2026-11-09T10:17:32.671Z"
   }
 ]
