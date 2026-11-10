@@ -2,6 +2,13 @@ import express from "express";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import dns from "dns/promises";
+import nodemailer from "nodemailer";
+
+import authRouter from "./routes/authRoutes.js";
+import adminRouter from "./routes/adminRoutes.js";
+import { authenticateToken } from "./middleware/authMiddleware.js";
+import { UserService } from "./services/userService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +24,436 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+
+// Mount Auth & Admin Routes
+app.use("/api/auth", authRouter);
+app.use("/api/admin", adminRouter);
+
+// ==========================================================================
+// Authorized Email Whitelist & Access Control
+// ==========================================================================
+function getAuthorizedEmails() {
+  const envEmails = process.env.AUTHORIZED_EMAILS || "";
+  if (!envEmails.trim()) {
+    // Default fallback authorized emails if not explicitly set in .env
+    return ["admin@aistudio.com", "demo@aistudio.com"];
+  }
+  return envEmails
+    .split(",")
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isEmailAuthorized(email) {
+  if (!email || typeof email !== "string") return false;
+  const cleanEmail = email.trim().toLowerCase();
+  const list = getAuthorizedEmails();
+  if (list.includes("*")) return true;
+  return list.some(allowed => {
+    if (allowed === "*") return true;
+    // Domain match: e.g. @company.com
+    if (allowed.startsWith("@")) {
+      return cleanEmail.endsWith(allowed);
+    }
+    return cleanEmail === allowed;
+  });
+}
+
+function requireAuthorizedEmail(req, res, next) {
+  // 1. Try JWT Bearer token authentication
+  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    return authenticateToken(req, res, next);
+  }
+
+  // 2. Legacy email check
+  const userEmail = req.headers["x-user-email"] || req.body?.userEmail;
+  if (userEmail) {
+    const user = UserService.findByEmail(userEmail);
+    if (user || isEmailAuthorized(userEmail)) {
+      req.user = user || { email: userEmail, role: "user" };
+      return next();
+    }
+  }
+
+  return res.status(401).json({
+    error: `Access Denied: Please log in to access this feature.`
+  });
+}
+
+// ==========================================================================
+// Email Existence & DNS MX Verification
+// ==========================================================================
+
+const DISPOSABLE_DOMAINS = new Set([
+  "mailinator.com", "tempmail.com", "10minutemail.com", "guerrillamail.com",
+  "yopmail.com", "trashmail.com", "sharklasers.com", "dispostable.com",
+  "getairmail.com", "throwawaymail.com", "temp-mail.org", "fakeinbox.com",
+  "temp-mail.io", "maildrop.cc", "mohmal.com", "nada.ltd"
+]);
+
+const MAJOR_TRUSTED_DOMAINS = new Set([
+  "gmail.com", "googlemail.com", "yahoo.com", "ymail.com", "outlook.com",
+  "hotmail.com", "live.com", "msn.com", "icloud.com", "me.com", "mac.com",
+  "proton.me", "protonmail.com", "zoho.com", "aol.com", "mail.com"
+]);
+
+async function verifyEmailExists(email) {
+  if (!email || typeof email !== "string") {
+    return { exists: false, error: "Please enter an email address." };
+  }
+
+  const clean = email.trim().toLowerCase();
+
+  // Allow internal demo email for local testing
+  if (clean === "demo@aistudio.com" || clean.endsWith("@localhost")) {
+    return { exists: true, domain: "aistudio.com" };
+  }
+
+  // 1. Syntax check
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  if (!emailRegex.test(clean)) {
+    return { exists: false, error: "Invalid email address format. Please check the spelling." };
+  }
+
+  const parts = clean.split("@");
+  if (parts.length !== 2) {
+    return { exists: false, error: "Invalid email address structure." };
+  }
+
+  const [, domain] = parts;
+  if (!domain || !domain.includes(".")) {
+    return { exists: false, error: "Email must include a valid domain extension (e.g. .com, .org)." };
+  }
+
+  const tld = domain.split(".").pop();
+  if (!tld || tld.length < 2) {
+    return { exists: false, error: "Invalid top-level domain in email address." };
+  }
+
+  // 2. Reject disposable domains
+  if (DISPOSABLE_DOMAINS.has(domain)) {
+    return { exists: false, error: "Temporary and disposable email addresses are not permitted. Please use a permanent email." };
+  }
+
+  // 3. Instant recognition for major trusted providers (avoids Windows network/DNS false alarms)
+  if (MAJOR_TRUSTED_DOMAINS.has(domain)) {
+    return { exists: true, domain };
+  }
+
+  // 4. Real DNS Mail Exchange (MX) check for custom domains
+  try {
+    const mxPromise = dns.resolveMx(domain);
+    const timeoutPromise = new Promise((_, reject) => {
+      const id = setTimeout(() => {
+        clearTimeout(id);
+        const err = new Error("DNS lookup timed out");
+        err.code = "ETIMEDOUT";
+        reject(err);
+      }, 5000);
+    });
+
+    const mxRecords = await Promise.race([mxPromise, timeoutPromise]);
+    if (!mxRecords || mxRecords.length === 0) {
+      return {
+        exists: false,
+        error: `This email does not exist! The domain '${domain}' has no active mail servers configured to receive emails.`
+      };
+    }
+    return { exists: true, domain, mx: mxRecords[0]?.exchange || domain };
+  } catch (err) {
+    if (err.code === "ENOTFOUND") {
+      return {
+        exists: false,
+        error: `This email does not exist! The domain '${domain}' was not found on the internet.`
+      };
+    } else if (err.code === "ENODATA") {
+      // Check fallback A record
+      try {
+        const aRecords = await dns.resolve(domain);
+        if (aRecords && aRecords.length > 0) {
+          return { exists: true, domain };
+        }
+      } catch {}
+      return {
+        exists: false,
+        error: `This email does not exist! The domain '${domain}' has no mail servers configured to receive emails.`
+      };
+    } else {
+      return {
+        exists: false,
+        error: `Could not verify email domain '${domain}'. Please check for typos and try again.`
+      };
+    }
+  }
+}
+
+// ==========================================================================
+// OTP Email Delivery System (Nodemailer + Fallback)
+// ==========================================================================
+
+const otpStore = new Map(); // email -> { code, expiresAt, createdAt, attempts }
+
+function createEmailTransporter() {
+  const host = process.env.SMTP_HOST;
+  const port = parseInt(process.env.SMTP_PORT || "587", 10);
+  const user = process.env.SMTP_USER || process.env.EMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+  const service = process.env.EMAIL_SERVICE;
+
+  // 1. Explicit service (e.g., 'gmail')
+  if (service && user && pass) {
+    return nodemailer.createTransport({
+      service,
+      auth: { user, pass }
+    });
+  }
+
+  // 2. Auto-detect Gmail if user is @gmail.com
+  if (user && pass && user.toLowerCase().includes("@gmail.com")) {
+    return nodemailer.createTransport({
+      service: "gmail",
+      auth: { user, pass }
+    });
+  }
+
+  // 3. Custom SMTP Host & Port
+  if (host && user && pass) {
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass }
+    });
+  }
+
+  return null;
+}
+
+async function sendOtpEmail(email, code) {
+  const transporter = createEmailTransporter();
+  const user = process.env.SMTP_USER || process.env.EMAIL_USER;
+  const fromAddress = process.env.SMTP_FROM || (user ? `"Agentic AI Studio" <${user}>` : `"Agentic AI Studio" <noreply@agentic-ai-studio.local>`);
+
+  if (transporter) {
+    try {
+      console.log(`[OTP] 📤 Sending live verification email to ${email} via SMTP...`);
+      const info = await transporter.sendMail({
+        from: fromAddress,
+        to: email,
+        subject: `🔐 Your Agentic AI Verification Code: ${code}`,
+        text: `Your Agentic AI Studio verification code is: ${code}\n\nThis code will expire in 5 minutes. Do not share this code with anyone.`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #0b0d14; color: #f8fafc; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1);">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h1 style="margin: 0; font-size: 24px; color: #38bdf8; font-weight: 800;">Agentic AI <span style="color: #c084fc;">Studio</span></h1>
+              <p style="margin: 6px 0 0; color: #94a3b8; font-size: 13px;">Security &amp; Account Verification</p>
+            </div>
+            <div style="background: rgba(255,255,255,0.04); border-radius: 12px; padding: 24px; border: 1px solid rgba(255,255,255,0.08); text-align: center;">
+              <p style="margin: 0 0 16px; color: #cbd5e1; font-size: 14px; line-height: 1.5;">Please use the following 6-digit verification code to activate your account:</p>
+              <div style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, rgba(56,189,248,0.15), rgba(129,140,248,0.15)); border: 2px dashed #818cf8; border-radius: 12px; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #ffffff; font-family: 'Courier New', monospace; margin-bottom: 16px;">
+                ${code}
+              </div>
+              <p style="margin: 0; color: #f59e0b; font-size: 12px;">⏳ This code is valid for 5 minutes only.</p>
+            </div>
+            <p style="margin: 20px 0 0; color: #64748b; font-size: 11px; text-align: center; line-height: 1.4;">If you did not request this verification code, please ignore this email.</p>
+          </div>
+        `
+      });
+      console.log(`[OTP] ✅ Live email sent successfully to ${email} (Message ID: ${info.messageId})`);
+      return { delivered: true, devMode: false };
+    } catch (err) {
+      console.error(`[OTP] ❌ SMTP send failed: ${err.message}`);
+      // Also log to terminal so developer can test if SMTP fails
+      console.log("\n" + "=".repeat(62));
+      console.log(`  🔐 [OTP VERIFICATION CODE - SMTP ERROR FALLBACK]`);
+      console.log(`  ➜  Recipient:  ${email}`);
+      console.log(`  ➜  OTP Code:   ${code}`);
+      console.log(`  ➜  SMTP Error: ${err.message}`);
+      console.log("=".repeat(62) + "\n");
+      return { delivered: false, devMode: false, error: err.message };
+    }
+  }
+
+  // Development mode (no SMTP credentials configured in .env):
+  console.log("\n" + "=".repeat(62));
+  console.log(`  🔐 [OTP VERIFICATION CODE (Terminal Only)]`);
+  console.log(`  ➜  Recipient:  ${email}`);
+  console.log(`  ➜  OTP Code:   ${code}`);
+  console.log(`  ➜  Expires:    5 Minutes`);
+  console.log(`  💡 (Configure EMAIL_USER & EMAIL_PASS in .env to deliver real emails to inbox)`);
+  console.log("=".repeat(62) + "\n");
+
+  return { delivered: false, devMode: true };
+}
+
+// Authentication verification endpoints
+app.get("/api/auth/config", (req, res) => {
+  const authorized = getAuthorizedEmails();
+  const hasSmtp = Boolean(process.env.EMAIL_USER || process.env.SMTP_USER);
+  res.json({
+    authorizedEmails: authorized,
+    isRestricted: true,
+    smtpEnabled: hasSmtp
+  });
+});
+
+app.post("/api/auth/verify-email", async (req, res) => {
+  const { email } = req.body;
+  if (!email || typeof email !== "string") {
+    return res.status(400).json({ authorized: false, message: "Please provide an email address." });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  // 1. Whitelist authorization check
+  const authorized = isEmailAuthorized(cleanEmail);
+  if (!authorized) {
+    return res.status(403).json({
+      authorized: false,
+      message: `Access Denied: '${cleanEmail}' is not in the authorized email list. Only pre-approved emails are allowed to sign in or register.`
+    });
+  }
+
+  // 2. Existence check (does domain actually exist)
+  const existence = await verifyEmailExists(cleanEmail);
+  if (!existence.exists) {
+    return res.status(400).json({
+      authorized: false,
+      message: existence.error || "This email does not exist."
+    });
+  }
+
+  res.json({
+    authorized: true,
+    message: "Email is valid and authorized."
+  });
+});
+
+// Endpoint: Send OTP to verify email during registration
+app.post("/api/auth/send-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ error: "Please enter an email address." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 0. Duplicate account check
+    const existingUser = UserService.findByEmail(cleanEmail);
+    if (existingUser) {
+      return res.status(409).json({
+        error: `An account with '${cleanEmail}' already exists. Please sign in instead.`
+      });
+    }
+
+    // 1. Whitelist Check
+    if (!isEmailAuthorized(cleanEmail)) {
+      return res.status(403).json({
+        error: `Access Denied: '${cleanEmail}' is not in the authorized email list.`
+      });
+    }
+
+    // 2. Email Existence Check (DNS MX resolution)
+    const existence = await verifyEmailExists(cleanEmail);
+    if (!existence.exists) {
+      return res.status(400).json({
+        error: existence.error || `This email does not exist! Please check the spelling.`
+      });
+    }
+
+    // 3. Rate limiting (20 seconds cooldown between requests)
+    const existing = otpStore.get(cleanEmail);
+    if (existing && Date.now() - existing.createdAt < 20000) {
+      const waitSeconds = Math.ceil((20000 - (Date.now() - existing.createdAt)) / 1000);
+      return res.status(429).json({
+        error: `Please wait ${waitSeconds}s before requesting a new code.`
+      });
+    }
+
+    // 4. Generate 6-digit numeric OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+    otpStore.set(cleanEmail, {
+      code,
+      expiresAt,
+      createdAt: Date.now(),
+      attempts: 0
+    });
+
+    // 5. Send live OTP email to user's inbox (or print to terminal fallback)
+    const sendResult = await sendOtpEmail(cleanEmail, code);
+
+    if (sendResult.delivered) {
+      return res.json({
+        success: true,
+        delivered: true,
+        email: cleanEmail,
+        message: `Verification code sent to your email (${cleanEmail}). Please check your inbox or spam folder.`
+      });
+    }
+
+    // Fallback when SMTP is not configured or fails: Log code to terminal so testing works seamlessly
+    return res.json({
+      success: true,
+      delivered: false,
+      devMode: true,
+      email: cleanEmail,
+      message: sendResult.error
+        ? `Live SMTP error (${sendResult.error}). Verification code logged in server terminal!`
+        : `Verification code sent! (Check your server terminal console or inbox).`
+    });
+  } catch (error) {
+    console.error("send-otp error:", error);
+    res.status(500).json({ error: "Failed to process OTP request. Please try again." });
+  }
+});
+
+// Endpoint: Verify OTP submitted by user
+app.post("/api/auth/verify-otp", (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: "Email and OTP code are required." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const record = otpStore.get(cleanEmail);
+
+    if (!record) {
+      return res.status(400).json({ error: "No verification code was requested for this email, or it has expired." });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(cleanEmail);
+      return res.status(400).json({ error: "Verification code has expired. Please request a new code." });
+    }
+
+    if (record.attempts >= 5) {
+      otpStore.delete(cleanEmail);
+      return res.status(400).json({ error: "Too many incorrect attempts. Please request a new verification code." });
+    }
+
+    if (record.code !== otp.trim()) {
+      record.attempts += 1;
+      return res.status(400).json({
+        error: `Incorrect verification code. ${5 - record.attempts} attempt(s) remaining.`
+      });
+    }
+
+    // Successfully verified!
+    otpStore.delete(cleanEmail);
+    res.json({
+      success: true,
+      message: "Email successfully verified!"
+    });
+  } catch (error) {
+    console.error("verify-otp error:", error);
+    res.status(500).json({ error: "Failed to verify code." });
+  }
+});
 
 const geminiApiKey = process.env.GEMINI_API_KEY;
 
@@ -94,7 +531,7 @@ async function callGemini(apiKey, safeMessages, timeInfo, liveWeatherInfo) {
 
   for (const model of modelsToTry) {
     try {
-      console.log(`[Gemini] Requesting response with model: ${model}...`);
+      console.log(`[Agentic AI] Requesting response with model: ${model}...`);
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const response = await fetch(url, {
         method: "POST",
@@ -114,11 +551,11 @@ async function callGemini(apiKey, safeMessages, timeInfo, liveWeatherInfo) {
 
       const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (reply) {
-        console.log(`[Gemini] Succeeded with model: ${model}`);
+        console.log(`[Agentic AI] Succeeded with model: ${model}`);
         return reply;
       }
     } catch (err) {
-      console.warn(`[Gemini] Model '${model}' failed: ${err.message}. Trying next fallback model...`);
+      console.warn(`[Agentic AI] Model '${model}' failed: ${err.message}. Trying next fallback model...`);
       lastError = err;
     }
   }
@@ -481,7 +918,7 @@ async function fetchVideoFromArchive(query) {
   return null;
 }
 
-app.post("/api/generate-image", async (req, res) => {
+app.post("/api/generate-image", requireAuthorizedEmail, async (req, res) => {
   try {
     const { prompt, style = "cinematic", aspectRatio = "1:1" } = req.body;
     if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
@@ -508,7 +945,7 @@ app.post("/api/generate-image", async (req, res) => {
   }
 });
 
-app.post("/api/generate-video", async (req, res) => {
+app.post("/api/generate-video", requireAuthorizedEmail, async (req, res) => {
   try {
     const { prompt, motion = "cinematic", aspectRatio = "16:9" } = req.body;
     if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
@@ -536,11 +973,11 @@ app.post("/api/generate-video", async (req, res) => {
   }
 });
 
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", requireAuthorizedEmail, async (req, res) => {
   try {
     if (!geminiApiKey) {
       return res.status(500).json({
-        error: "Gemini API key missing. Add GEMINI_API_KEY to your .env file, then restart the server."
+        error: "Agentic AI API key missing. Add GEMINI_API_KEY to your .env file, then restart the server."
       });
     }
 
@@ -685,6 +1122,24 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`AI Chatbox is running at http://localhost:${PORT}`);
+const server = app.listen(PORT, "0.0.0.0", () => {
+  const authorized = getAuthorizedEmails();
+  console.log("\n" + "=".repeat(62));
+  console.log("  🚀 AI Studio Server Started Successfully!");
+  console.log("=".repeat(62));
+  console.log(`  ➜  Local:    http://localhost:${PORT}`);
+  console.log(`  ➜  Network:  http://127.0.0.1:${PORT}`);
+  console.log("-".repeat(62));
+  console.log("  💡 Hold Ctrl (or Cmd) and click the link above to open in browser");
+  console.log(`  🔒 Whitelist Active: [${authorized.join(", ")}]`);
+  console.log("=".repeat(62) + "\n");
+});
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`\n❌ Error: Port ${PORT} is already in use by another running process!`);
+    console.error(`👉 Solution: Stop any existing node server running on port ${PORT}, or change PORT in .env\n`);
+  } else {
+    console.error("Server startup error:", err.message);
+  }
 });

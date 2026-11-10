@@ -1,5 +1,5 @@
 /**
- * Gemini AI Studio · 2026 Modern Client Logic
+ * Agentic AI Studio · 2026 Modern Client Logic
  */
 
 // DOM Elements
@@ -23,10 +23,128 @@ const scrollBottomBtn = document.querySelector("#scroll-bottom-btn");
 const chatHistoryList = document.querySelector("#chat-history-list");
 const pinCurrentBtn = document.querySelector("#pin-current-btn");
 
+// Auth DOM Elements
+const authScreen = document.querySelector("#auth-screen");
+const appLayout = document.querySelector("#app-layout");
+const tabLoginBtn = document.querySelector("#tab-login-btn");
+const tabSignupBtn = document.querySelector("#tab-signup-btn");
+const authLoginForm = document.querySelector("#auth-login-form");
+const authSignupForm = document.querySelector("#auth-signup-form");
+const authAlert = document.querySelector("#auth-alert");
+const loginEmailInput = document.querySelector("#login-email");
+const loginPasswordInput = document.querySelector("#login-password");
+const loginRememberCheck = document.querySelector("#login-remember");
+const signupNameInput = document.querySelector("#signup-name");
+const signupEmailInput = document.querySelector("#signup-email");
+const signupPasswordInput = document.querySelector("#signup-password");
+const signupConfirmPasswordInput = document.querySelector("#signup-confirm-password");
+const guestLoginBtn = document.querySelector("#guest-login-btn");
+const socialGoogleBtn = document.querySelector("#social-google-btn");
+const socialGithubBtn = document.querySelector("#social-github-btn");
+const toggleLoginPwdBtn = document.querySelector("#toggle-login-pwd-btn");
+const toggleSignupPwdBtn = document.querySelector("#toggle-signup-pwd-btn");
+const authForgotLink = document.querySelector("#auth-forgot-link");
+const authThemeToggleBtn = document.querySelector("#auth-theme-toggle-btn");
+const authThemeIconDark = document.querySelector("#auth-theme-icon-dark");
+const authThemeIconLight = document.querySelector("#auth-theme-icon-light");
+
+// OTP DOM Elements
+const authOtpForm = document.querySelector("#auth-otp-form");
+const otpCodeInput = document.querySelector("#otp-code-input");
+const otpTargetEmailDisplay = document.querySelector("#otp-target-email-display");
+const otpTimerDisplay = document.querySelector("#otp-timer-display");
+const resendOtpBtn = document.querySelector("#resend-otp-btn");
+const otpVerifySubmitBtn = document.querySelector("#otp-verify-submit-btn");
+const backToSignupBtn = document.querySelector("#back-to-signup-btn");
+
+let pendingRegistration = null;
+let otpTimerInterval = null;
+
+// User Profile Display DOM Elements
+const userDisplayName = document.querySelector("#user-display-name");
+const userDisplayEmail = document.querySelector("#user-display-email");
+const userAvatarBadge = document.querySelector("#user-avatar-badge");
+const topbarUsername = document.querySelector("#topbar-username");
+const topbarAvatar = document.querySelector("#topbar-avatar");
+const logoutBtn = document.querySelector("#logout-btn");
+const topbarLogoutBtn = document.querySelector("#topbar-logout-btn");
+
+// Forgot & Reset Password DOM Elements
+const authForgotForm = document.querySelector("#auth-forgot-form");
+const forgotEmailInput = document.querySelector("#forgot-email");
+const backToLoginFromForgotBtn = document.querySelector("#back-to-login-from-forgot-btn");
+const authResetForm = document.querySelector("#auth-reset-form");
+const resetTokenInput = document.querySelector("#reset-token-input");
+const resetNewPasswordInput = document.querySelector("#reset-new-password");
+const resetConfirmPasswordInput = document.querySelector("#reset-confirm-password");
+const backToLoginFromResetBtn = document.querySelector("#back-to-login-from-reset-btn");
+
+// Admin & Change Password DOM Elements
+const topbarRoleBadge = document.querySelector("#topbar-role-badge");
+const topbarAdminBtn = document.querySelector("#topbar-admin-btn");
+const topbarChangePwdBtn = document.querySelector("#topbar-change-pwd-btn");
+const adminPanelModal = document.querySelector("#admin-panel-modal");
+const closeAdminPanelBtn = document.querySelector("#close-admin-panel-btn");
+const changePasswordModal = document.querySelector("#change-password-modal");
+const closeChangePwdBtn = document.querySelector("#close-change-pwd-btn");
+const cancelChangePwdBtn = document.querySelector("#cancel-change-pwd-btn");
+const changePasswordForm = document.querySelector("#change-password-form");
+
+// JWT Authentication State & Helpers
+const ACCESS_TOKEN_KEY = "agentic_access_token";
+const REFRESH_TOKEN_KEY = "agentic_refresh_token";
+
+function getAccessToken() {
+  return localStorage.getItem(ACCESS_TOKEN_KEY) || "";
+}
+
+function setTokens(tokens) {
+  if (tokens?.accessToken) localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+  if (tokens?.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+}
+
+function clearTokens() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+async function authFetch(url, options = {}) {
+  const token = getAccessToken();
+  const headers = { ...(options.headers || {}) };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const user = getCurrentUser();
+  if (user?.email) {
+    headers["x-user-email"] = user.email;
+  }
+
+  let res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (refreshToken) {
+      try {
+        const refreshRes = await fetch("/api/auth/refresh-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken })
+        });
+        const refreshData = await refreshRes.json();
+        if (refreshRes.ok && refreshData.tokens) {
+          setTokens(refreshData.tokens);
+          headers["Authorization"] = `Bearer ${refreshData.tokens.accessToken}`;
+          res = await fetch(url, { ...options, headers });
+        }
+      } catch {}
+    }
+  }
+  return res;
+}
+
 // State Management
 let currentChatId = Date.now().toString();
 let conversation = [];
-let chatSessions = JSON.parse(localStorage.getItem("gemini_chat_sessions") || "[]");
+let chatSessions = JSON.parse(localStorage.getItem("agentic_chat_sessions") || localStorage.getItem("gemini_chat_sessions") || "[]");
 let isWaitingForReply = false;
 let speechRecognizer = null;
 let isRecording = false;
@@ -44,28 +162,35 @@ if (window.marked) {
 // ==========================================================================
 
 function initTheme() {
-  const savedTheme = localStorage.getItem("gemini_theme") || "dark";
+  const savedTheme = localStorage.getItem("agentic_theme") || localStorage.getItem("gemini_theme") || "dark";
   document.documentElement.setAttribute("data-theme", savedTheme);
   updateThemeIcon(savedTheme);
 }
 
 function updateThemeIcon(theme) {
   if (theme === "dark") {
-    themeIconDark.style.display = "block";
-    themeIconLight.style.display = "none";
+    if (themeIconDark) themeIconDark.style.display = "block";
+    if (themeIconLight) themeIconLight.style.display = "none";
+    if (authThemeIconDark) authThemeIconDark.style.display = "block";
+    if (authThemeIconLight) authThemeIconLight.style.display = "none";
   } else {
-    themeIconDark.style.display = "none";
-    themeIconLight.style.display = "block";
+    if (themeIconDark) themeIconDark.style.display = "none";
+    if (themeIconLight) themeIconLight.style.display = "block";
+    if (authThemeIconDark) authThemeIconDark.style.display = "none";
+    if (authThemeIconLight) authThemeIconLight.style.display = "block";
   }
 }
 
-themeToggleBtn.addEventListener("click", () => {
+function toggleTheme() {
   const current = document.documentElement.getAttribute("data-theme") || "dark";
   const target = current === "dark" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", target);
-  localStorage.setItem("gemini_theme", target);
+  localStorage.setItem("agentic_theme", target);
   updateThemeIcon(target);
-});
+}
+
+themeToggleBtn?.addEventListener("click", toggleTheme);
+authThemeToggleBtn?.addEventListener("click", toggleTheme);
 
 // ==========================================================================
 // Live Clock
@@ -114,7 +239,7 @@ function sortAndSaveSessions() {
   const unpinned = chatSessions.filter(s => !s.isPinned).slice(0, 30);
   chatSessions = [...pinned, ...unpinned];
 
-  localStorage.setItem("gemini_chat_sessions", JSON.stringify(chatSessions));
+  localStorage.setItem("agentic_chat_sessions", JSON.stringify(chatSessions));
 }
 
 function saveCurrentSession() {
@@ -269,7 +394,7 @@ function loadSession(sessionId) {
 
 function deleteSession(sessionId) {
   chatSessions = chatSessions.filter(s => s.id !== sessionId);
-  localStorage.setItem("gemini_chat_sessions", JSON.stringify(chatSessions));
+  localStorage.setItem("agentic_chat_sessions", JSON.stringify(chatSessions));
   if (currentChatId === sessionId) {
     resetChat();
   } else {
@@ -762,9 +887,13 @@ async function sendMessage(text) {
   const typingRow = renderMessageDOM("assistant", "", true);
 
   try {
-    const response = await fetch("/api/chat", {
+    const currentUser = getCurrentUser();
+    const response = await authFetch("/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-email": currentUser?.email || ""
+      },
       body: JSON.stringify({
         messages: conversation,
         clientTime: new Date().toLocaleString(undefined, {
@@ -780,6 +909,13 @@ async function sendMessage(text) {
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
       })
     });
+
+    if (response.status === 403) {
+      const errData = await response.json();
+      logout();
+      showAuthAlert(errData.error || "Session expired or unauthorized email address.", "error");
+      return;
+    }
 
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "The model request failed.");
@@ -967,7 +1103,7 @@ if (pinCurrentBtn) {
 }
 
 // Download Media Helper
-async function downloadMedia(url, defaultName = "gemini-ai-creation.png") {
+async function downloadMedia(url, defaultName = "agentic-ai-creation.png") {
   try {
     const res = await fetch(url);
     const blob = await res.blob();
@@ -1111,9 +1247,12 @@ generateImageBtn?.addEventListener("click", async () => {
   generateImageBtn.innerHTML = `<span>✨ Synthesizing DALL·E 3 Vision...</span>`;
 
   try {
-    const res = await fetch("/api/generate-image", {
+    const res = await authFetch("/api/generate-image", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-email": getCurrentUser()?.email || ""
+      },
       body: JSON.stringify({ prompt, style: selectedStyle, aspectRatio: selectedAspect })
     });
     const data = await res.json();
@@ -1188,9 +1327,12 @@ generateVideoBtn?.addEventListener("click", async () => {
   generateVideoBtn.innerHTML = `<span>Rendering AI Video Clip...</span>`;
 
   try {
-    const res = await fetch("/api/generate-video", {
+    const res = await authFetch("/api/generate-video", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-email": getCurrentUser()?.email || ""
+      },
       body: JSON.stringify({ prompt, motion: selectedMotion, aspectRatio: selectedAspect })
     });
     const data = await res.json();
@@ -1259,7 +1401,947 @@ sendVideoChatBtn?.addEventListener("click", () => {
   saveCurrentSession();
 });
 
+// ==========================================================================
+// Authentication & Session Management
+// ==========================================================================
+
+const AUTH_USER_KEY = "agentic_current_user";
+const AUTH_USERS_KEY = "agentic_registered_users";
+
+// Default seed users & pre-registered accounts
+function getRegisteredUsers() {
+  const stored = localStorage.getItem(AUTH_USERS_KEY) || localStorage.getItem("gemini_registered_users");
+  let users = [];
+  try {
+    users = stored ? JSON.parse(stored) : [];
+  } catch {
+    users = [];
+  }
+
+  const preRegistered = [
+    {
+      name: "Prashant kumar",
+      email: "prashantk6515@gmail.com",
+      password: "123456",
+      avatar: "P"
+    },
+    {
+      name: "Demo User",
+      email: "demo@aistudio.com",
+      password: "password123",
+      avatar: "D"
+    },
+    {
+      name: "Rajan Gupta",
+      email: "rg7367610@gmail.com",
+      password: "password123",
+      avatar: "R"
+    }
+  ];
+
+  let modified = false;
+  for (const pre of preRegistered) {
+    const existingIndex = users.findIndex(u => u.email.toLowerCase() === pre.email.toLowerCase());
+    if (existingIndex === -1) {
+      users.push(pre);
+      modified = true;
+    } else if (pre.email === "prashantk6515@gmail.com" && users[existingIndex].password !== "123456") {
+      users[existingIndex].password = "123456";
+      modified = true;
+    }
+  }
+
+  if (modified || !stored) {
+    localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
+  }
+  return users;
+}
+
+function saveRegisteredUsers(users) {
+  localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
+}
+
+function getCurrentUser() {
+  const stored = localStorage.getItem(AUTH_USER_KEY) || localStorage.getItem("gemini_current_user");
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return null;
+  }
+}
+
+function showAuthAlert(message, type = "error") {
+  if (!authAlert) return;
+  authAlert.textContent = message;
+  authAlert.className = `auth-alert ${type}`;
+  authAlert.style.display = "flex";
+}
+
+function hideAuthAlert() {
+  if (!authAlert) return;
+  authAlert.style.display = "none";
+  authAlert.textContent = "";
+}
+
+function setAuthMode(mode) {
+  hideAuthAlert();
+  clearInterval(otpTimerInterval);
+  if (authOtpForm) authOtpForm.style.display = "none";
+  if (authForgotForm) authForgotForm.style.display = "none";
+  if (authResetForm) authResetForm.style.display = "none";
+
+  if (mode === "signup") {
+    tabSignupBtn?.classList.add("active");
+    tabSignupBtn?.setAttribute("aria-selected", "true");
+    tabLoginBtn?.classList.remove("active");
+    tabLoginBtn?.setAttribute("aria-selected", "false");
+    if (authLoginForm) authLoginForm.style.display = "none";
+    if (authSignupForm) authSignupForm.style.display = "block";
+    signupNameInput?.focus();
+  } else if (mode === "otp") {
+    tabSignupBtn?.classList.add("active");
+    tabSignupBtn?.setAttribute("aria-selected", "true");
+    tabLoginBtn?.classList.remove("active");
+    tabLoginBtn?.setAttribute("aria-selected", "false");
+    if (authLoginForm) authLoginForm.style.display = "none";
+    if (authSignupForm) authSignupForm.style.display = "none";
+    if (authOtpForm) authOtpForm.style.display = "block";
+    otpCodeInput?.focus();
+  } else if (mode === "forgot") {
+    tabLoginBtn?.classList.remove("active");
+    tabSignupBtn?.classList.remove("active");
+    if (authLoginForm) authLoginForm.style.display = "none";
+    if (authSignupForm) authSignupForm.style.display = "none";
+    if (authForgotForm) authForgotForm.style.display = "block";
+    if (forgotEmailInput) {
+      forgotEmailInput.value = loginEmailInput?.value || "";
+      forgotEmailInput.focus();
+    }
+  } else if (mode === "reset") {
+    tabLoginBtn?.classList.remove("active");
+    tabSignupBtn?.classList.remove("active");
+    if (authLoginForm) authLoginForm.style.display = "none";
+    if (authSignupForm) authSignupForm.style.display = "none";
+    if (authResetForm) authResetForm.style.display = "block";
+    resetTokenInput?.focus();
+  } else {
+    // Default: Login
+    tabLoginBtn?.classList.add("active");
+    tabLoginBtn?.setAttribute("aria-selected", "true");
+    tabSignupBtn?.classList.remove("active");
+    tabSignupBtn?.setAttribute("aria-selected", "false");
+    if (authSignupForm) authSignupForm.style.display = "none";
+    if (authLoginForm) authLoginForm.style.display = "block";
+    loginEmailInput?.focus();
+  }
+}
+
+tabLoginBtn?.addEventListener("click", () => setAuthMode("login"));
+tabSignupBtn?.addEventListener("click", () => setAuthMode("signup"));
+
+// Navigation links for Forgot & Reset Password
+authForgotLink?.addEventListener("click", (e) => {
+  e.preventDefault();
+  setAuthMode("forgot");
+});
+
+backToLoginFromForgotBtn?.addEventListener("click", () => setAuthMode("login"));
+backToLoginFromResetBtn?.addEventListener("click", () => setAuthMode("login"));
+
+// Password visibility toggles
+toggleLoginPwdBtn?.addEventListener("click", () => {
+  if (!loginPasswordInput) return;
+  const isPwd = loginPasswordInput.type === "password";
+  loginPasswordInput.type = isPwd ? "text" : "password";
+  const showIcon = toggleLoginPwdBtn.querySelector(".eye-show");
+  const hideIcon = toggleLoginPwdBtn.querySelector(".eye-hide");
+  if (showIcon) showIcon.style.display = isPwd ? "none" : "block";
+  if (hideIcon) hideIcon.style.display = isPwd ? "block" : "none";
+});
+
+toggleSignupPwdBtn?.addEventListener("click", () => {
+  if (!signupPasswordInput) return;
+  const isPwd = signupPasswordInput.type === "password";
+  signupPasswordInput.type = isPwd ? "text" : "password";
+  const showIcon = toggleSignupPwdBtn.querySelector(".eye-show");
+  const hideIcon = toggleSignupPwdBtn.querySelector(".eye-hide");
+  if (showIcon) showIcon.style.display = isPwd ? "none" : "block";
+  if (hideIcon) hideIcon.style.display = isPwd ? "block" : "none";
+});
+
+// Real-time Password Strength Meter
+signupPasswordInput?.addEventListener("input", () => {
+  const pwd = signupPasswordInput.value || "";
+  let score = 0;
+  if (pwd.length >= 6) score += 25;
+  if (pwd.length >= 8) score += 25;
+  if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score += 25;
+  if (/[0-9]/.test(pwd) || /[^A-Za-z0-9]/.test(pwd)) score += 25;
+
+  const bar = document.querySelector("#pwd-strength-bar");
+  const label = document.querySelector("#pwd-strength-label");
+  if (!bar || !label) return;
+
+  bar.style.width = `${Math.max(score, 10)}%`;
+  if (score <= 25) {
+    bar.style.backgroundColor = "#f43f5e";
+    label.textContent = "Strength: Weak (at least 6-8 chars recommended)";
+  } else if (score <= 50) {
+    bar.style.backgroundColor = "#f59e0b";
+    label.textContent = "Strength: Fair (add uppercase & numbers)";
+  } else if (score <= 75) {
+    bar.style.backgroundColor = "#38bdf8";
+    label.textContent = "Strength: Good";
+  } else {
+    bar.style.backgroundColor = "#10b981";
+    label.textContent = "Strength: Strong & Secure";
+  }
+});
+
+function applyUserToUI(user) {
+  if (!user) return;
+  const initial = (user.name || user.email || "U").trim().charAt(0).toUpperCase();
+  if (userDisplayName) userDisplayName.textContent = user.name || "User";
+  if (userDisplayEmail) userDisplayEmail.textContent = user.email || "";
+  if (userAvatarBadge) userAvatarBadge.textContent = initial;
+  if (topbarUsername) topbarUsername.textContent = user.name || "User";
+  if (topbarAvatar) topbarAvatar.textContent = initial;
+
+  // Role badge (Admin vs User)
+  const roleBadge = document.querySelector("#topbar-role-badge");
+  if (roleBadge) {
+    const role = user.role || "user";
+    roleBadge.textContent = role === "admin" ? "Admin" : "User";
+    roleBadge.className = `role-badge ${role}`;
+  }
+
+  // Admin panel button: Only visible to administrators
+  const adminBtn = document.querySelector("#topbar-admin-btn");
+  if (adminBtn) {
+    adminBtn.style.display = user.role === "admin" ? "inline-flex" : "none";
+  }
+}
+
+function loginSuccess(user, tokens = null) {
+  if (tokens) setTokens(tokens);
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  applyUserToUI(user);
+  showAuthAlert(`Welcome, ${user.name}! Opening AI Studio...`, "success");
+
+  setTimeout(() => {
+    hideAuthAlert();
+    authScreen?.classList.add("hidden");
+    appLayout?.classList.remove("hidden");
+    messageInput?.focus();
+  }, 400);
+}
+
+function logout() {
+  clearTokens();
+  localStorage.removeItem(AUTH_USER_KEY);
+  authFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+  appLayout?.classList.add("hidden");
+  authScreen?.classList.remove("hidden");
+  if (loginPasswordInput) loginPasswordInput.value = "";
+  setAuthMode("login");
+  loginEmailInput?.focus();
+}
+
+logoutBtn?.addEventListener("click", logout);
+topbarLogoutBtn?.addEventListener("click", logout);
+
+// ==========================================================================
+// 1. Secure Login Form Submit (BCrypt + JWT Authentication)
+// ==========================================================================
+authLoginForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hideAuthAlert();
+
+  const email = loginEmailInput?.value.trim().toLowerCase();
+  const password = loginPasswordInput?.value;
+  const rememberMe = loginRememberCheck?.checked || false;
+
+  if (!email || !password) {
+    showAuthAlert("Please provide both email and password.", "error");
+    return;
+  }
+
+  const submitBtn = document.querySelector("#login-submit-btn");
+  const origText = submitBtn ? submitBtn.innerHTML : "";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span>Signing in...</span>`;
+  }
+
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, rememberMe })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showAuthAlert(data.error || "Login failed. Please check your credentials.", "error");
+      return;
+    }
+
+    loginSuccess(data.user, data.tokens);
+  } catch (err) {
+    showAuthAlert("Network error while connecting to server. Please check your server status.", "error");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origText;
+    }
+  }
+});
+
+// ==========================================================================
+// 2. Secure Sign Up Form Submit (Sends OTP first, then verifies)
+// ==========================================================================
+authSignupForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hideAuthAlert();
+
+  const name = signupNameInput?.value.trim();
+  const email = signupEmailInput?.value.trim().toLowerCase();
+  const password = signupPasswordInput?.value;
+  const confirmPassword = signupConfirmPasswordInput?.value;
+
+  if (!name || name.length < 2) {
+    showAuthAlert("Please enter a valid full name (at least 2 characters).", "error");
+    return;
+  }
+
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+    showAuthAlert("Please enter a valid email address.", "error");
+    return;
+  }
+
+  if (!password || password.length < 6) {
+    showAuthAlert("Password must be at least 6 characters.", "error");
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    showAuthAlert("Passwords do not match. Please retype.", "error");
+    return;
+  }
+
+  const signupBtn = document.querySelector("#signup-submit-btn");
+  const origBtnHtml = signupBtn ? signupBtn.innerHTML : "";
+  if (signupBtn) {
+    signupBtn.disabled = true;
+    signupBtn.innerHTML = `<span>Sending verification code...</span>`;
+  }
+
+  try {
+    const res = await fetch("/api/auth/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showAuthAlert(data.error || "Failed to send verification code. Please try again.", "error");
+      return;
+    }
+
+    // Save pending registration details for step 2
+    pendingRegistration = { name, email, password, confirmPassword };
+
+    // Transition to OTP verification form
+    setAuthMode("otp");
+
+    if (otpTargetEmailDisplay) {
+      otpTargetEmailDisplay.textContent = email;
+    }
+
+    if (otpCodeInput) {
+      otpCodeInput.value = "";
+      otpCodeInput.focus();
+    }
+
+    startOtpTimer(300);
+
+    const alertType = data.delivered ? "success" : "warning";
+    showAuthAlert(data.message || `Verification code sent to ${email}.`, alertType);
+  } catch (err) {
+    showAuthAlert("Network error while sending verification code. Please try again.", "error");
+  } finally {
+    if (signupBtn) {
+      signupBtn.disabled = false;
+      signupBtn.innerHTML = origBtnHtml;
+    }
+  }
+});
+
+// ==========================================================================
+// 3. Forgot Password Form Submit
+// ==========================================================================
+authForgotForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hideAuthAlert();
+
+  const email = forgotEmailInput?.value.trim().toLowerCase();
+  if (!email) {
+    showAuthAlert("Please enter your account email.", "error");
+    return;
+  }
+
+  const forgotBtn = document.querySelector("#forgot-submit-btn");
+  const origHtml = forgotBtn ? forgotBtn.innerHTML : "";
+  if (forgotBtn) {
+    forgotBtn.disabled = true;
+    forgotBtn.innerHTML = `<span>Generating reset code...</span>`;
+  }
+
+  try {
+    const res = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showAuthAlert(data.error || "Failed to process forgot password.", "error");
+      return;
+    }
+
+    setAuthMode("reset");
+    if (resetTokenInput && (data.resetCode || data.resetToken)) {
+      resetTokenInput.value = data.resetCode || data.resetToken;
+    }
+    showAuthAlert(data.message || `Reset instructions generated for ${email}.`, "success");
+  } catch (err) {
+    showAuthAlert("Network error while requesting password reset.", "error");
+  } finally {
+    if (forgotBtn) {
+      forgotBtn.disabled = false;
+      forgotBtn.innerHTML = origHtml;
+    }
+  }
+});
+
+// ==========================================================================
+// 4. Reset Password Form Submit
+// ==========================================================================
+authResetForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hideAuthAlert();
+
+  const token = resetTokenInput?.value.trim();
+  const newPassword = resetNewPasswordInput?.value;
+  const confirmPassword = resetConfirmPasswordInput?.value;
+
+  if (!token) {
+    showAuthAlert("Please enter the reset code or token.", "error");
+    return;
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    showAuthAlert("New password must be at least 6 characters.", "error");
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    showAuthAlert("Passwords do not match. Please retype.", "error");
+    return;
+  }
+
+  const resetBtn = document.querySelector("#reset-submit-btn");
+  const origHtml = resetBtn ? resetBtn.innerHTML : "";
+  if (resetBtn) {
+    resetBtn.disabled = true;
+    resetBtn.innerHTML = `<span>Updating password...</span>`;
+  }
+
+  try {
+    const res = await fetch("/api/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, newPassword, confirmPassword })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showAuthAlert(data.error || "Failed to reset password.", "error");
+      return;
+    }
+
+    setAuthMode("login");
+    showAuthAlert("✅ Password reset successfully! You can now sign in with your new password.", "success");
+    if (loginPasswordInput) loginPasswordInput.value = "";
+  } catch (err) {
+    showAuthAlert("Network error while resetting password.", "error");
+  } finally {
+    if (resetBtn) {
+      resetBtn.disabled = false;
+      resetBtn.innerHTML = origHtml;
+    }
+  }
+});
+
+// ==========================================================================
+// 5. Change Password Modal (Logged-In User)
+// ==========================================================================
+topbarChangePwdBtn?.addEventListener("click", () => {
+  if (changePasswordModal) {
+    changePasswordModal.style.display = "flex";
+    const alertBox = document.querySelector("#change-pwd-alert");
+    if (alertBox) alertBox.style.display = "none";
+    document.querySelector("#current-pwd-input")?.focus();
+  }
+});
+
+closeChangePwdBtn?.addEventListener("click", () => {
+  if (changePasswordModal) changePasswordModal.style.display = "none";
+});
+
+cancelChangePwdBtn?.addEventListener("click", () => {
+  if (changePasswordModal) changePasswordModal.style.display = "none";
+});
+
+changePasswordForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const alertBox = document.querySelector("#change-pwd-alert");
+  const showAlert = (msg, type = "error") => {
+    if (!alertBox) return;
+    alertBox.textContent = msg;
+    alertBox.className = `auth-alert ${type}`;
+    alertBox.style.display = "flex";
+  };
+
+  const currentPassword = document.querySelector("#current-pwd-input")?.value;
+  const newPassword = document.querySelector("#new-pwd-input")?.value;
+  const confirmPassword = document.querySelector("#confirm-new-pwd-input")?.value;
+
+  if (!currentPassword || !newPassword) {
+    showAlert("Please enter both current and new password.", "error");
+    return;
+  }
+
+  if (newPassword.length < 6) {
+    showAlert("New password must be at least 6 characters.", "error");
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    showAlert("New passwords do not match.", "error");
+    return;
+  }
+
+  const submitBtn = document.querySelector("#submit-change-pwd-btn");
+  const origHtml = submitBtn ? submitBtn.innerHTML : "";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span>Updating...</span>`;
+  }
+
+  try {
+    const res = await authFetch("/api/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showAlert(data.error || "Failed to update password.", "error");
+      return;
+    }
+
+    showAlert("✅ Password changed successfully!", "success");
+    changePasswordForm.reset();
+    setTimeout(() => {
+      if (changePasswordModal) changePasswordModal.style.display = "none";
+    }, 1200);
+  } catch (err) {
+    showAlert("Network error while changing password.", "error");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origHtml;
+    }
+  }
+});
+
+// ==========================================================================
+// 6. Role-Based Access Control (Admin Panel Modal)
+// ==========================================================================
+topbarAdminBtn?.addEventListener("click", () => {
+  openAdminPanel();
+});
+
+closeAdminPanelBtn?.addEventListener("click", () => {
+  if (adminPanelModal) adminPanelModal.style.display = "none";
+});
+
+async function openAdminPanel() {
+  if (!adminPanelModal) return;
+  adminPanelModal.style.display = "flex";
+  await loadAdminStats();
+  await loadAdminUsers();
+}
+
+async function loadAdminStats() {
+  try {
+    const res = await authFetch("/api/admin/stats");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.stats) {
+      const totalEl = document.querySelector("#admin-stat-total");
+      const adminsEl = document.querySelector("#admin-stat-admins");
+      const regularEl = document.querySelector("#admin-stat-regular");
+      if (totalEl) totalEl.textContent = data.stats.totalUsers;
+      if (adminsEl) adminsEl.textContent = data.stats.totalAdmins;
+      if (regularEl) regularEl.textContent = data.stats.totalRegularUsers;
+    }
+  } catch (err) {
+    console.error("Failed to load admin stats:", err);
+  }
+}
+
+async function loadAdminUsers() {
+  const tbody = document.querySelector("#admin-users-tbody");
+  if (!tbody) return;
+
+  try {
+    const res = await authFetch("/api/admin/users");
+    const data = await res.json();
+
+    if (!res.ok || !data.users) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-rose); padding: 18px;">${data.error || "Failed to load users."}</td></tr>`;
+      return;
+    }
+
+    const currentUser = getCurrentUser();
+    tbody.innerHTML = data.users.map(u => {
+      const isSelf = currentUser && currentUser.email?.toLowerCase() === u.email?.toLowerCase();
+      const roleBadgeClass = u.role === "admin" ? "admin" : "user";
+      const nextRole = u.role === "admin" ? "user" : "admin";
+      const roleBtnText = u.role === "admin" ? "Make Regular User" : "Promote to Admin";
+      const roleBtnClass = u.role === "admin" ? "demote" : "promote";
+
+      return `
+        <tr>
+          <td>
+            <div class="admin-user-cell">
+              <div class="admin-user-avatar">${(u.name || "U").charAt(0).toUpperCase()}</div>
+              <span>${u.name} ${isSelf ? '<small style="color: #38bdf8;">(You)</small>' : ''}</span>
+            </div>
+          </td>
+          <td style="font-family: var(--font-mono); font-size: 12px;">${u.email}</td>
+          <td><span class="role-badge ${roleBadgeClass}">${u.role}</span></td>
+          <td style="color: var(--text-muted); font-size: 11.5px;">${new Date(u.createdAt).toLocaleDateString()}</td>
+          <td style="text-align: right;">
+            ${!isSelf ? `
+              <button class="action-pill-btn ${roleBtnClass}" onclick="toggleUserRole('${u.id}', '${nextRole}')">
+                ${roleBtnText}
+              </button>
+              <button class="action-pill-btn delete" onclick="deleteUserAccount('${u.id}', '${u.email}')" title="Delete User">
+                Delete
+              </button>
+            ` : '<span style="color: var(--text-muted); font-size: 11px;">Active Session</span>'}
+          </td>
+        </tr>
+      `;
+    }).join("");
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-rose); padding: 18px;">Network error loading users.</td></tr>`;
+  }
+}
+
+// Global handlers for Admin Table Actions
+window.toggleUserRole = async function(userId, newRole) {
+  if (!confirm(`Are you sure you want to change this user's role to '${newRole}'?`)) return;
+  try {
+    const res = await authFetch(`/api/admin/users/${userId}/role`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: newRole })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      alert(data.error || "Failed to update role.");
+      return;
+    }
+    await loadAdminStats();
+    await loadAdminUsers();
+  } catch (err) {
+    alert("Network error updating role.");
+  }
+};
+
+window.deleteUserAccount = async function(userId, email) {
+  if (!confirm(`Are you sure you want to permanently delete user account '${email}'?`)) return;
+  try {
+    const res = await authFetch(`/api/admin/users/${userId}`, {
+      method: "DELETE"
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      alert(data.error || "Failed to delete user.");
+      return;
+    }
+    await loadAdminStats();
+    await loadAdminUsers();
+  } catch (err) {
+    alert("Network error deleting user.");
+  }
+};
+
+// OTP Timer Controller
+function startOtpTimer(durationSeconds = 300) {
+  if (otpTimerInterval) clearInterval(otpTimerInterval);
+  let remaining = durationSeconds;
+  if (resendOtpBtn) {
+    resendOtpBtn.disabled = true;
+    resendOtpBtn.textContent = "Resend Code";
+  }
+
+  function updateDisplay() {
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    if (otpTimerDisplay) {
+      otpTimerDisplay.textContent = `Expires in: ${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+    if (remaining <= 0) {
+      clearInterval(otpTimerInterval);
+      if (otpTimerDisplay) otpTimerDisplay.textContent = "Code expired";
+      if (resendOtpBtn) {
+        resendOtpBtn.disabled = false;
+        resendOtpBtn.textContent = "Resend Code";
+      }
+    }
+    remaining--;
+  }
+
+  updateDisplay();
+  otpTimerInterval = setInterval(updateDisplay, 1000);
+}
+
+// Handle OTP Verification Submit (Step 2: Verify code & complete registration)
+authOtpForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hideAuthAlert();
+
+  if (!pendingRegistration) {
+    showAuthAlert("Registration session expired. Please fill the signup form again.", "error");
+    setAuthMode("signup");
+    return;
+  }
+
+  const otp = otpCodeInput?.value.trim();
+  if (!otp || otp.length !== 6) {
+    showAuthAlert("Please enter the complete 6-digit OTP code.", "error");
+    otpCodeInput?.focus();
+    return;
+  }
+
+  const verifyBtn = document.querySelector("#otp-verify-submit-btn");
+  const origBtnHtml = verifyBtn ? verifyBtn.innerHTML : "";
+  if (verifyBtn) {
+    verifyBtn.disabled = true;
+    verifyBtn.innerHTML = `<span>Verifying code...</span>`;
+  }
+
+  try {
+    // Step A: Verify OTP with server
+    const verifyRes = await fetch("/api/auth/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: pendingRegistration.email,
+        otp
+      })
+    });
+
+    const verifyData = await verifyRes.json();
+    if (!verifyRes.ok || !verifyData.success) {
+      showAuthAlert(verifyData.error || "Invalid verification code. Please try again.", "error");
+      return;
+    }
+
+    // Step B: OTP verified! Complete account registration on backend
+    if (verifyBtn) {
+      verifyBtn.innerHTML = `<span>Activating account...</span>`;
+    }
+
+    const regRes = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: pendingRegistration.name,
+        email: pendingRegistration.email,
+        password: pendingRegistration.password,
+        confirmPassword: pendingRegistration.confirmPassword
+      })
+    });
+
+    const regData = await regRes.json();
+    if (!regRes.ok || !regData.success) {
+      showAuthAlert(regData.error || "Failed to create account. Please try again.", "error");
+      return;
+    }
+
+    // Clear timer & pending state
+    clearInterval(otpTimerInterval);
+    const completedUser = regData.user;
+    const tokens = regData.tokens;
+    pendingRegistration = null;
+
+    // Log the user in and transition to AI Studio
+    loginSuccess(completedUser, tokens);
+  } catch (err) {
+    showAuthAlert("Verification failed: " + err.message, "error");
+  } finally {
+    if (verifyBtn) {
+      verifyBtn.disabled = false;
+      verifyBtn.innerHTML = origBtnHtml;
+    }
+  }
+});
+
+// Resend OTP
+resendOtpBtn?.addEventListener("click", async () => {
+  if (!pendingRegistration || !pendingRegistration.email) return;
+  hideAuthAlert();
+
+  resendOtpBtn.disabled = true;
+  resendOtpBtn.textContent = "Sending...";
+
+  try {
+    const res = await fetch("/api/auth/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: pendingRegistration.email })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showAuthAlert(data.error || "Failed to resend code.", "error");
+      resendOtpBtn.disabled = false;
+      resendOtpBtn.textContent = "Resend Code";
+      return;
+    }
+    startOtpTimer(300);
+    if (otpCodeInput) otpCodeInput.value = "";
+    showAuthAlert(data.message || `New verification code sent to ${pendingRegistration.email}.`, data.delivered ? "success" : "warning");
+  } catch (err) {
+    showAuthAlert("Error resending code: " + err.message, "error");
+    resendOtpBtn.disabled = false;
+    resendOtpBtn.textContent = "Resend Code";
+  }
+});
+
+// Back to signup form
+backToSignupBtn?.addEventListener("click", () => {
+  clearInterval(otpTimerInterval);
+  setAuthMode("signup");
+  signupEmailInput?.focus();
+});
+
+// 1-Click Authorized Demo Login
+guestLoginBtn?.addEventListener("click", async () => {
+  const check = await verifyEmailAuthorized("demo@aistudio.com");
+  if (!check.authorized) {
+    showAuthAlert("The default demo account is currently not in the authorized whitelist.", "error");
+    return;
+  }
+  const demoUser = {
+    name: "Authorized Demo User",
+    email: "demo@aistudio.com",
+    avatar: "D"
+  };
+  loginSuccess(demoUser);
+});
+
+// Social Logins (Google / GitHub) with Whitelist Check
+socialGoogleBtn?.addEventListener("click", async () => {
+  const email = prompt("Enter your authorized Google email address:");
+  if (!email || !email.trim()) return;
+  const cleanEmail = email.trim().toLowerCase();
+  const check = await verifyEmailAuthorized(cleanEmail);
+  if (!check.authorized) {
+    showAuthAlert(`🚫 Access Denied: '${cleanEmail}' is not in the authorized email list.`, "error");
+    return;
+  }
+  const googleUser = {
+    name: cleanEmail.split("@")[0],
+    email: cleanEmail,
+    avatar: cleanEmail.charAt(0).toUpperCase()
+  };
+  loginSuccess(googleUser);
+});
+
+socialGithubBtn?.addEventListener("click", async () => {
+  const email = prompt("Enter your authorized GitHub email address:");
+  if (!email || !email.trim()) return;
+  const cleanEmail = email.trim().toLowerCase();
+  const check = await verifyEmailAuthorized(cleanEmail);
+  if (!check.authorized) {
+    showAuthAlert(`🚫 Access Denied: '${cleanEmail}' is not in the authorized email list.`, "error");
+    return;
+  }
+  const githubUser = {
+    name: cleanEmail.split("@")[0],
+    email: cleanEmail,
+    avatar: "GH"
+  };
+  loginSuccess(githubUser);
+});
+
+async function initAuth() {
+  getRegisteredUsers(); // ensure seed demo user exists
+  const token = getAccessToken();
+  const currentUser = getCurrentUser();
+
+  if (token) {
+    try {
+      const res = await authFetch("/api/auth/me");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
+          applyUserToUI(data.user);
+          authScreen?.classList.add("hidden");
+          appLayout?.classList.remove("hidden");
+          return;
+        }
+      }
+    } catch {
+      // Fall through to local check
+    }
+  }
+
+  if (currentUser && currentUser.email) {
+    applyUserToUI(currentUser);
+    authScreen?.classList.add("hidden");
+    appLayout?.classList.remove("hidden");
+    return;
+  }
+
+  appLayout?.classList.add("hidden");
+  authScreen?.classList.remove("hidden");
+}
+
 // Initialize App
 initTheme();
+initAuth();
 renderChatHistory();
-messageInput.focus();
+
+if (getCurrentUser()) {
+  messageInput?.focus();
+} else {
+  if (loginEmailInput && !loginEmailInput.value) {
+    loginEmailInput.value = "prashantk6515@gmail.com";
+  }
+  if (loginPasswordInput && !loginPasswordInput.value) {
+    loginPasswordInput.value = "123456";
+  }
+  loginEmailInput?.focus();
+}

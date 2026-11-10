@@ -1,0 +1,32 @@
+[
+  {
+    "id": "usr_admin_default",
+    "name": "Studio Administrator",
+    "email": "admin@aistudio.com",
+    "passwordHash": "$2b$10$ub.gn3CISyYBDUhF/ZeZOu4Uppl0YWD7WYugCkkHRMU9gD8JKxKPa",
+    "role": "admin",
+    "isVerified": true,
+    "createdAt": "2026-11-09T10:00:02.754Z",
+    "updatedAt": "2026-11-09T10:00:02.757Z"
+  },
+  {
+    "id": "usr_demo_default",
+    "name": "Demo User",
+    "email": "demo@aistudio.com",
+    "passwordHash": "$2b$10$Dh.MN81afpS61s9aRLd/DeweroHsg0yKH7ENvgHV9KbjdY2QitmkG",
+    "role": "user",
+    "isVerified": true,
+    "createdAt": "2026-11-09T10:00:02.863Z",
+    "updatedAt": "2026-11-09T10:00:02.863Z"
+  },
+  {
+    "id": "usr_prashant_01",
+    "name": "Prashant Kumar",
+    "email": "prashantk6515@gmail.com",
+    "passwordHash": "$2b$10$N80jI/meljNSVfJiTs/j3O21fpHCA2WLg7ld82TZlj1eLzbAecjxK",
+    "role": "admin",
+    "isVerified": true,
+    "createdAt": "2026-11-09T10:17:32.670Z",
+    "updatedAt": "2026-11-09T10:17:32.671Z"
+  }
+]

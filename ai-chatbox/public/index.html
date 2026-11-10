@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>Gemini AI Studio · Modern AI Chatbox</title>
-  <meta name="description" content="Next-generation AI chat interface powered by Gemini with real-time clock, live weather data, multi-model fallback, and modern aesthetics.">
+  <title>Agentic AI Studio · Modern AI Chatbox</title>
+  <meta name="description" content="Next-generation AI chat interface powered by Agentic AI with real-time clock, live weather data, multi-model fallback, and modern aesthetics.">
   
   <!-- Modern Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,7 +18,281 @@
   <script src="script.js" defer></script>
 </head>
 <body>
-  <div class="app-layout">
+  <!-- Authentication Portal (Login / Sign Up) -->
+  <div id="auth-screen" class="auth-screen">
+    <!-- Top Bar with Theme Toggle -->
+    <div class="auth-topbar">
+      <button id="auth-theme-toggle-btn" class="icon-btn auth-theme-btn" aria-label="Toggle theme" title="Toggle Theme">
+        <svg id="auth-theme-icon-dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg id="auth-theme-icon-light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+    </div>
+
+    <!-- Animated Ambient Lights -->
+    <div class="auth-glow-orb orb-1"></div>
+    <div class="auth-glow-orb orb-2"></div>
+    <div class="auth-glow-orb orb-3"></div>
+
+    <div class="auth-container">
+      <div class="auth-card">
+        <!-- Logo & Title -->
+        <div class="auth-header">
+          <div class="auth-security-badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Authorized Email Access Only</span>
+          </div>
+          <div class="auth-logo-badge">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="url(#auth-sparkle)" />
+              <defs>
+                <linearGradient id="auth-sparkle" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#38bdf8"/>
+                  <stop offset="0.5" stop-color="#818cf8"/>
+                  <stop offset="1" stop-color="#c084fc"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <h1 class="auth-title">Agentic AI <span class="gradient-text">Studio</span></h1>
+          <p class="auth-tagline">Access is restricted to pre-authorized email addresses only.</p>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="auth-tabs" role="tablist">
+          <button id="tab-login-btn" class="auth-tab active" type="button" role="tab" aria-selected="true">Sign In</button>
+          <button id="tab-signup-btn" class="auth-tab" type="button" role="tab" aria-selected="false">Create Account</button>
+        </div>
+
+        <!-- Notification Message Banner -->
+        <div id="auth-alert" class="auth-alert" style="display: none;" role="alert"></div>
+
+        <!-- SIGN IN FORM -->
+        <form id="auth-login-form" class="auth-form" autocomplete="on">
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="login-email">Email or Username</label>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input id="login-email" type="text" class="auth-input" placeholder="demo@aistudio.com" value="demo@aistudio.com" required autocomplete="username" />
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <div class="auth-label-row">
+              <label class="auth-field-label" for="login-password">Password</label>
+              <a href="javascript:void(0)" id="auth-forgot-link" class="auth-link-subtle">Forgot?</a>
+            </div>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input id="login-password" type="password" class="auth-input" placeholder="••••••••" value="password123" required autocomplete="current-password" />
+              <button type="button" id="toggle-login-pwd-btn" class="auth-pwd-toggle" aria-label="Toggle password visibility">
+                <svg class="eye-show" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-hide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="auth-remember-row">
+            <label class="auth-checkbox-label">
+              <input type="checkbox" id="login-remember" checked />
+              <span>Keep me signed in</span>
+            </label>
+          </div>
+
+          <button id="login-submit-btn" type="submit" class="auth-btn-submit">
+            <span>Sign In to AI Studio</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </form>
+
+        <!-- SIGN UP FORM -->
+        <form id="auth-signup-form" class="auth-form" style="display: none;" autocomplete="on">
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="signup-name">Full Name</label>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <input id="signup-name" type="text" class="auth-input" placeholder="e.g. Alex Morgan" required autocomplete="name" />
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="signup-email">Email Address</label>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input id="signup-email" type="email" class="auth-input" placeholder="name@example.com" required autocomplete="email" />
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="signup-password">Password</label>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input id="signup-password" type="password" class="auth-input" placeholder="At least 6 characters" required autocomplete="new-password" />
+              <button type="button" id="toggle-signup-pwd-btn" class="auth-pwd-toggle" aria-label="Toggle password visibility">
+                <svg class="eye-show" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-hide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"/></svg>
+              </button>
+            </div>
+            <!-- Password Strength Indicator -->
+            <div class="pwd-strength-container" id="signup-pwd-strength">
+              <div class="pwd-strength-track">
+                <div class="pwd-strength-bar" id="pwd-strength-bar"></div>
+              </div>
+              <span class="pwd-strength-label" id="pwd-strength-label">Password strength: Weak</span>
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="signup-confirm-password">Confirm Password</label>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <input id="signup-confirm-password" type="password" class="auth-input" placeholder="Re-enter your password" required autocomplete="new-password" />
+            </div>
+          </div>
+
+          <button id="signup-submit-btn" type="submit" class="auth-btn-submit">
+            <span>Send OTP &amp; Create Account</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </form>
+
+        <!-- FORGOT PASSWORD FORM -->
+        <form id="auth-forgot-form" class="auth-form" style="display: none;" autocomplete="on">
+          <div class="otp-instruction-card">
+            <div class="otp-icon-badge">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <h3 class="otp-card-title">Reset Your Password</h3>
+            <p class="otp-card-desc">Enter your account email to receive a password reset token/code.</p>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="forgot-email">Account Email</label>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input id="forgot-email" type="email" class="auth-input" placeholder="name@example.com" required autocomplete="email" />
+            </div>
+          </div>
+
+          <button id="forgot-submit-btn" type="submit" class="auth-btn-submit">
+            <span>Generate Reset Code</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+
+          <button type="button" id="back-to-login-from-forgot-btn" class="auth-btn-back">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            <span>Back to Sign In</span>
+          </button>
+        </form>
+
+        <!-- RESET PASSWORD FORM -->
+        <form id="auth-reset-form" class="auth-form" style="display: none;" autocomplete="off">
+          <div class="otp-instruction-card">
+            <div class="otp-icon-badge">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <h3 class="otp-card-title">Set New Password</h3>
+            <p class="otp-card-desc">Enter your reset code or token, then choose a new password.</p>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="reset-token-input">Reset Token or 6-Char Code</label>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input id="reset-token-input" type="text" class="auth-input" placeholder="e.g. 849201 or token" required />
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="reset-new-password">New Password</label>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input id="reset-new-password" type="password" class="auth-input" placeholder="At least 6 characters" required autocomplete="new-password" />
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="reset-confirm-password">Confirm New Password</label>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              <input id="reset-confirm-password" type="password" class="auth-input" placeholder="Re-enter new password" required autocomplete="new-password" />
+            </div>
+          </div>
+
+          <button id="reset-submit-btn" type="submit" class="auth-btn-submit">
+            <span>Update Password</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+
+          <button type="button" id="back-to-login-from-reset-btn" class="auth-btn-back">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            <span>Back to Sign In</span>
+          </button>
+        </form>
+
+        <!-- OTP VERIFICATION FORM (Step 2 of Account Creation) -->
+        <form id="auth-otp-form" class="auth-form" style="display: none;" autocomplete="off">
+          <div class="otp-instruction-card">
+            <div class="otp-icon-badge">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            </div>
+            <h3 class="otp-card-title">Check Your Email for OTP</h3>
+            <p class="otp-card-desc">We sent a 6-digit verification code to <span id="otp-target-email-display" class="otp-email-highlight">user@example.com</span></p>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="otp-code-input">6-Digit Verification Code</label>
+            <div class="auth-input-wrapper">
+              <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input id="otp-code-input" type="text" class="auth-input otp-code-input" placeholder="123456" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code" />
+            </div>
+          </div>
+
+          <div class="otp-timer-row">
+            <span id="otp-timer-display" class="otp-timer-text">Expires in: 05:00</span>
+            <button type="button" id="resend-otp-btn" class="auth-link-subtle" disabled>Resend Code</button>
+          </div>
+
+          <button id="otp-verify-submit-btn" type="submit" class="auth-btn-submit">
+            <span>Verify &amp; Activate Account</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+
+          <button type="button" id="back-to-signup-btn" class="auth-btn-back">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            <span>Change Email Address</span>
+          </button>
+        </form>
+
+        <div class="auth-divider">
+          <span>or quickly enter</span>
+        </div>
+
+        <!-- 1-Click Guest & Demo -->
+        <button id="guest-login-btn" type="button" class="auth-btn-guest">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>⚡ Instant Demo / Guest Login</span>
+        </button>
+
+        <div class="auth-social-grid">
+          <button id="social-google-btn" type="button" class="auth-btn-social">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z"/></svg>
+            <span>Google</span>
+          </button>
+          <button id="social-github-btn" type="button" class="auth-btn-social">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            <span>GitHub</span>
+          </button>
+        </div>
+
+        <div class="auth-demo-badge">
+          <span class="badge-tag">Whitelist Active</span>
+          <span>Authorized Demo: <code>demo@aistudio.com</code> (Add your email in <code>.env</code>)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-layout" class="app-layout">
     <!-- Sidebar -->
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
@@ -35,7 +309,7 @@
               </defs>
             </svg>
           </div>
-          <span class="brand-text">Gemini <span class="brand-badge">Studio</span></span>
+          <span class="brand-text">Agentic AI <span class="brand-badge">Studio</span></span>
         </div>
         <button id="close-sidebar-btn" class="icon-btn mobile-only" aria-label="Close sidebar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -63,12 +337,26 @@
         <div class="system-status-card">
           <div class="status-indicator">
             <span class="pulse-dot"></span>
-            <span class="status-text">Gemini Multi-Fallback</span>
+            <span class="status-text">Agentic AI Multi-Fallback</span>
           </div>
           <div class="status-features">
             <span class="feature-tag">Live Weather</span>
             <span class="feature-tag">Real-Time Clock</span>
           </div>
+        </div>
+
+        <!-- User Profile Card in Sidebar -->
+        <div id="user-profile-card" class="user-profile-card">
+          <div class="user-profile-meta">
+            <div id="user-avatar-badge" class="user-avatar-badge">D</div>
+            <div class="user-text-info">
+              <span id="user-display-name" class="user-name">Demo User</span>
+              <span id="user-display-email" class="user-email">demo@aistudio.com</span>
+            </div>
+          </div>
+          <button id="logout-btn" class="icon-btn logout-btn" title="Sign Out / Log Out" aria-label="Sign Out">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          </button>
         </div>
       </div>
     </aside>
@@ -83,7 +371,7 @@
           </button>
           <div class="model-pill">
             <span class="model-dot"></span>
-            <span class="model-name">Gemini 3.5 / 3.1 Flash</span>
+            <span class="model-name">Agentic AI 3.5 / Flash</span>
             <span class="model-version">v2026</span>
           </div>
         </div>
@@ -111,6 +399,22 @@
           <button id="clear-chat-btn" class="icon-btn" aria-label="Clear chat" title="Clear Chat">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
           </button>
+
+          <!-- Topbar User Profile & Actions -->
+          <div class="topbar-user-pill" id="topbar-user-pill">
+            <div id="topbar-avatar" class="topbar-avatar">D</div>
+            <span id="topbar-username" class="topbar-username">Demo User</span>
+            <span id="topbar-role-badge" class="role-badge user">User</span>
+            <button id="topbar-admin-btn" class="icon-subtle-btn admin-only-btn" style="display: none;" title="Admin RBAC Panel" aria-label="Admin Panel">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </button>
+            <button id="topbar-change-pwd-btn" class="icon-subtle-btn" title="Change Password" aria-label="Change Password">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </button>
+            <button id="topbar-logout-btn" class="topbar-logout-btn" title="Sign Out" aria-label="Sign Out">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -189,7 +493,7 @@
             <textarea
               id="message-input"
               rows="1"
-              placeholder="Message Gemini AI Studio... (Shift + Enter for new line)"
+              placeholder="Message Agentic AI Studio... (Shift + Enter for new line)"
               aria-label="Your message"
               required
             ></textarea>
@@ -221,7 +525,7 @@
             </div>
           </div>
         </form>
-        <div class="composer-disclaimer">Gemini AI Studio may produce inaccuracies. Real-time clock and live weather data are dynamically queried.</div>
+        <div class="composer-disclaimer">Agentic AI Studio may produce inaccuracies. Real-time clock and live weather data are dynamically queried.</div>
       </div>
     </main>
   </div>
@@ -376,6 +680,115 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change Password Modal -->
+  <div id="change-password-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-header-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div>
+          <h3 class="modal-title">Change Account Password</h3>
+          <p class="modal-subtitle">Update your password to keep your account secure.</p>
+        </div>
+        <button id="close-change-pwd-btn" class="modal-close-btn" type="button" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div id="change-pwd-alert" class="auth-alert" style="display: none;"></div>
+
+      <form id="change-password-form" class="modal-form">
+        <div class="auth-field-group">
+          <label class="auth-field-label" for="current-pwd-input">Current Password</label>
+          <div class="auth-input-wrapper">
+            <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="current-pwd-input" type="password" class="auth-input" placeholder="Enter current password" required />
+          </div>
+        </div>
+
+        <div class="auth-field-group">
+          <label class="auth-field-label" for="new-pwd-input">New Password</label>
+          <div class="auth-input-wrapper">
+            <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="new-pwd-input" type="password" class="auth-input" placeholder="At least 6 characters" required />
+          </div>
+        </div>
+
+        <div class="auth-field-group">
+          <label class="auth-field-label" for="confirm-new-pwd-input">Confirm New Password</label>
+          <div class="auth-input-wrapper">
+            <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            <input id="confirm-new-pwd-input" type="password" class="auth-input" placeholder="Re-enter new password" required />
+          </div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" id="cancel-change-pwd-btn" class="auth-btn-back">Cancel</button>
+          <button type="submit" id="submit-change-pwd-btn" class="auth-btn-submit">
+            <span>Update Password</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin RBAC Management Modal -->
+  <div id="admin-panel-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card admin-modal-card">
+      <div class="modal-header">
+        <div class="modal-header-icon admin-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>
+          <h3 class="modal-title">Role-Based Access Control (Admin Panel)</h3>
+          <p class="modal-subtitle">Manage registered users, inspect statistics, and configure privileges.</p>
+        </div>
+        <button id="close-admin-panel-btn" class="modal-close-btn" type="button" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="admin-stats-grid">
+        <div class="admin-stat-card">
+          <span class="admin-stat-number" id="admin-stat-total">--</span>
+          <span class="admin-stat-label">Total Users</span>
+        </div>
+        <div class="admin-stat-card">
+          <span class="admin-stat-number" id="admin-stat-admins">--</span>
+          <span class="admin-stat-label">Administrators</span>
+        </div>
+        <div class="admin-stat-card">
+          <span class="admin-stat-number" id="admin-stat-regular">--</span>
+          <span class="admin-stat-label">Regular Users</span>
+        </div>
+      </div>
+
+      <div id="admin-alert" class="auth-alert" style="display: none;"></div>
+
+      <!-- Users Table -->
+      <div class="admin-table-wrapper">
+        <table class="admin-users-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Registered</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="admin-users-tbody">
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">Loading users...</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

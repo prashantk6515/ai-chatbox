@@ -9,7 +9,10 @@
   },
   "dependencies": {
     "@heyputer/puter.js": "^2.6.4",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^10.4.0"
   }
 }
